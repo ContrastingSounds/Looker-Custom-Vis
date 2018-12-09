@@ -4,7 +4,7 @@
   background-color: #fff;
   overflow: hidden;
   font-family: Open Sans,Helvetica,Arial,sans-serif;    /* FONT FAMILY   */
-  font-size: 14px;
+  font-size: 11px;                                      /* FONT SIZE     */
   text-align: left;
   -ms-transform: translatez(0);
   transform: translatez(0);
