@@ -41,30 +41,52 @@ looker.plugins.visualizations.add({
   },
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
-    // changed_options = {}
-    // queryResponse.fields.measure_like.forEach(function(field) {
-    //   id = field.name
-    //   changed_options[id] = {
-    //     label: field.label_short,
-    //     default: "#8B7DA8",
-    //     section: "Style",
-    //     type: "string",
-    //     display: "color"
-    //   }
-    // })
+    new_options = {}
+    queryResponse.fields.dimension_like.forEach(function(field) {
+      safe_name = field.name.replace(".", "|")
+      id = "Width: " + safe_name
+      new_options[id] = {
+        label: "Width: " + field.label_short,
+        default: null,
+        section: "Layout",
+        type: "number",
+        display: "range",
+        min: 5,
+        max: 400
+      }
+      id = "Order: " + safe_name
+      new_options[id] = {
+        label: "Order: " + field.label_short,
+        default: null,
+        section: "Layout",
+        type: "number",
+        display: "number"
+      }
+    })
 
-    // queryResponse.fields.dimension_like.forEach(function(field) {
-    //   id = field.name
-    //   changed_options[id] = {
-    //     label: field.label_short,
-    //     default: "#8B7DA8",
-    //     section: "Style",
-    //     type: "string",
-    //     display: "color"
-    //   }
-    // })
+    queryResponse.fields.measure_like.forEach(function(field) {
+      safe_name = field.name.replace(".", "|")
+      id = "Width: " + safe_name
+      new_options[id] = {
+        label: "Width: " + field.label_short,
+        default: null,
+        section: "Layout",
+        type: "number",
+        display: "range",
+        min: 5,
+        max: 400
+      }
+      id = "Order: " + safe_name
+      new_options[id] = {
+        label: "Order: " + field.label_short,
+        default: null,
+        section: "Layout",
+        type: "number",
+        display: "number"
+      }
+    })
 
-    // this.trigger('registerOptions', changed_options) // register options with parent page to update visConfig
+    this.trigger('registerOptions', new_options) // register options with parent page to update visConfig
 
     // Clear any errors from previous updates.
     this.clearErrors();
@@ -77,7 +99,9 @@ looker.plugins.visualizations.add({
 
     // print data to console for debugging:
     console.log("data", data);
+    // console.log("element", element); 
     console.log("config", config);
+    // console.log("details", details);
     console.log("queryResponse", queryResponse);
 
     // Set style (this could be made flexible as per https://github.com/looker/custom_visualizations_v2/blob/master/src/examples/subtotal/subtotal.ts)
@@ -106,6 +130,10 @@ looker.plugins.visualizations.add({
           title: dim_object.label_short,
           field: safe_name,
           align: dim_object.align,
+        }
+
+        if (config["Width: " + safe_name] != null) {
+          dim_definition["width"] = config["Width: " + safe_name]
         }
         dim_details.push(dim_definition)
     }
@@ -145,6 +173,19 @@ looker.plugins.visualizations.add({
           title: mea_object.label_short,
           field: safe_name,
           align: mea_object.align,
+        }
+
+        if (mea_object.type == "sum") {
+          mea_definition["bottomCalc"] = "sum"
+        }
+        else if (mea_object.type == "average") {
+          mea_definition["bottomCalc"] = "avg"
+        }
+        else if (mea_object.type == "average_distinct") {
+          mea_definition["bottomCalc"] = "avg"
+        }
+        if (config["Width: " + safe_name] != null) {
+          mea_definition["width"] = config["Width: " + safe_name]
         }
         mea_details.push(mea_definition)
     }
@@ -186,6 +227,7 @@ looker.plugins.visualizations.add({
       movableColumns: true,      //allow column order to be changed
       resizableColumns: true,
       resizableRows: false,       //allow row size to be changed
+      groupBy: "users|gender",
       initialSort:[             //set the initial sort order of the data
         {column:"users|average_age", dir:"asc"},
       ],
