@@ -20,12 +20,6 @@ looker.plugins.visualizations.add({
       section: "Table Layout",
       type: "boolean",
       label: "Add Spacers",
-      // values: [
-      //   {"Split Dimensions": true},
-      //   {"Continuous Columns": false}
-      // ],
-      // display: "radio",
-      // display_size: "half",
       default: true
     }
   },
@@ -42,51 +36,68 @@ looker.plugins.visualizations.add({
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
     new_options = {}
+    group_by_options = []
     queryResponse.fields.dimension_like.forEach(function(field) {
-      safe_name = field.name.replace(".", "|")
-      id = "Width: " + safe_name
+      safe_name = field.name.replace(".", "|");
+      id = "Width: " + safe_name;
       new_options[id] = {
         label: "Width: " + field.label_short,
         default: null,
         section: "Layout",
         type: "number",
-        display: "range",
-        min: 5,
-        max: 400
-      }
-      id = "Order: " + safe_name
-      new_options[id] = {
-        label: "Order: " + field.label_short,
-        default: null,
-        section: "Layout",
-        type: "number",
-        display: "number"
-      }
-    })
+        display: "number",
+        // min: 5,
+        // max: 400
+      };
+      group_by_options.push("a"); // {field.label_short: safe_name}
+
+      // WIDTH ONLY FOR NOW
+      //
+      // id = "Order: " + safe_name
+      // new_options[id] = {
+      //   label: "Order: " + field.label_short,
+      //   default: null,
+      //   section: "Layout",
+      //   type: "number",
+      //   display: "number"
+      // }
+    });
+
+    new_options["group_by"] = {
+      section: "Data",
+      type: "array",
+      label: "Group By",
+      values: group_by_options,
+      display: "select",
+      default: null,
+    };
 
     queryResponse.fields.measure_like.forEach(function(field) {
-      safe_name = field.name.replace(".", "|")
-      id = "Width: " + safe_name
+      safe_name = field.name.replace(".", "|");
+      id = "Width: " + safe_name;
       new_options[id] = {
         label: "Width: " + field.label_short,
         default: null,
         section: "Layout",
         type: "number",
-        display: "range",
-        min: 5,
-        max: 400
-      }
-      id = "Order: " + safe_name
-      new_options[id] = {
-        label: "Order: " + field.label_short,
-        default: null,
-        section: "Layout",
-        type: "number",
-        display: "number"
-      }
-    })
+        display: "number",
+        // min: 5,
+        // max: 400
+      };
 
-    this.trigger('registerOptions', new_options) // register options with parent page to update visConfig
+      // WIDTH ONLY FOR NOW
+      //
+      // id = "Order: " + safe_name
+      // new_options[id] = {
+      //   label: "Order: " + field.label_short,
+      //   default: null,
+      //   section: "Layout",
+      //   type: "number",
+      //   display: "number"
+      // }
+    });
+
+    this.trigger('registerOptions', new_options); // register options with parent page to update visConfig
 
     // Clear any errors from previous updates.
     this.clearErrors();
@@ -130,6 +141,7 @@ looker.plugins.visualizations.add({
           title: dim_object.label_short,
           field: safe_name,
           align: dim_object.align,
+          // frozen: true,
         }
 
         if (config["Width: " + safe_name] != null) {
@@ -214,10 +226,14 @@ looker.plugins.visualizations.add({
     console.log("table_col_details", table_col_details)
     console.log("tbl_data", tbl_data)
 
+    if (config.group_by != null) {
+      initial_sort = config.group_by
+    }
+
     var tbl = $("#finance-tabulator").tabulator({
       nestedFieldSeparator:"~", //change the field separator character to a pipe
       data: tbl_data,           //load row data from array
-      layout: "fitColumns",      //fit columns to width of table
+      layout:"fitDataFill",      // fit columns to data, but also fill full table width
       responsiveLayout: "hide",  //hide columns that dont fit on the table
       tooltips: false,            //show tool tips on cells
       addRowPos: "top",          //when adding a new row, add it to the top of the table
@@ -229,9 +245,16 @@ looker.plugins.visualizations.add({
       resizableRows: false,       //allow row size to be changed
       groupBy: "users|gender",
       initialSort:[             //set the initial sort order of the data
-        {column:"users|average_age", dir:"asc"},
+        {column: config.group_by, dir:"asc"},
       ],
       columns: table_col_details,
+
+      columnResized: function(column){
+        console.log("column", column);
+        col_resize = {};
+        col_resize["Width: " + column.column.definition.field] = column.column.width;
+        // this.trigger('updateConfig', [col_resize]);
+      },
     });
 
     // Always call done to indicate a visualization has finished rendering.
