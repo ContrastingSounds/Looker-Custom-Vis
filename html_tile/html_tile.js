@@ -1,3 +1,10 @@
+/*
+
+Dependency:
+https://unpkg.com/liquidjs/dist/liquid.min.js
+
+*/
+
 html_tile_style = `
   .html-tile {
     font-family: Open Sans,Helvetica,Arial,sans-serif;
