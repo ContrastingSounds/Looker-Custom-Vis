@@ -576,29 +576,32 @@ looker.plugins.visualizations.add({
         //create Tabulator on DOM element with id "example-table"@
             tabletime = new Tabulator("#my-table", {
             rowFormatter:function(row){
-            var rowData = row.getData();
-            var currentStyle = row.getElement().className;
-            row.getElement().style.fontSize = config.body_font_size + "px";
-            row.getElement().style.textAlign = config.text_align;
-            if (config.comparison_type == 'exact') {
-                if(rowData[coloringColumn] == config.comparison_value){
-                    currentStyle = currentStyle + " " + config.comparison_result;
-                    // row.getElement().setAttribute("class",currentStyle);
-                    }
-            } else {
-                if(config.comparison_type == 'numeric') {
-                    console.log(coloringColumn);
-                    console.log(rowData["sorting_value_" + coloringColumn]);
-                    console.log(config.comparison_value);
-                    var colorTF = numericThreshGetter(rowData["sorting_value_" + coloringColumn],config.comparison_value);
-                    console.log(colorTF);
-                    if (colorTF == true) {
+                var rowData = row.getData();
+                var currentStyle = row.getElement().className;
+
+                row.getElement().style.fontSize = config.body_font_size + "px";
+                row.getElement().style.textAlign = config.text_align;
+                
+                if (config.comparison_type == 'exact') {
+                    if(rowData[coloringColumn] == config.comparison_value){
                         currentStyle = currentStyle + " " + config.comparison_result;
-                    }
-                } 
-            }
-            row.getElement().setAttribute("class",currentStyle);
+                        // row.getElement().setAttribute("class",currentStyle);
+                        }
+                } else {
+                    if(config.comparison_type == 'numeric') {
+                        console.log(coloringColumn);
+                        console.log(rowData["sorting_value_" + coloringColumn]);
+                        console.log(config.comparison_value);
+                        var colorTF = numericThreshGetter(rowData["sorting_value_" + coloringColumn],config.comparison_value);
+                        console.log(colorTF);
+                        if (colorTF == true) {
+                            currentStyle = currentStyle + " " + config.comparison_result;
+                        }
+                    } 
+                }
+                row.getElement().setAttribute("class",currentStyle);
             },
+
             height:config.table_height, // set height of table (in CSS or here), this enables the Virtual DOM and improves render speed dramatically (can be any valid css height value)
             layout:config.table_layout,
             scrollToRowIfVisible: false,
@@ -608,9 +611,10 @@ looker.plugins.visualizations.add({
                 var linkCol = cell.getField();
                 linkCol = 'links_' + linkCol;
                 var linkData = cell.getData()[linkCol];
+                
                 LookerCharts.Utils.openDrillMenu({
-                links: linkData,
-                event: e
+                    links: linkData,
+                    event: e
                 });
             },
         }); 

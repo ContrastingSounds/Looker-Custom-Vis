@@ -805,19 +805,21 @@ looker.plugins.visualizations.add({
   },
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
+    var vis = this;
+
     new_options = global_options
     group_by_options = []
     queryResponse.fields.dimension_like.forEach(function(field) {
       safe_name = field.name.replace(".", "|");
       id = "Width: " + safe_name;
       new_options[id] = {
-        label: "Width: " + field.label_short,
+        // label: "Width: " + field.label_short,
         default: null,
-        section: "Layout",
+        // section: "Layout",
         type: "number",
-        display: "range",
-        min: 5,
-        max: 400
+        // display: "range",
+        // min: 5,
+        // max: 400
       };
       group_by_options.push("a"); // {field.label_short: safe_name}
 
@@ -846,13 +848,13 @@ looker.plugins.visualizations.add({
       safe_name = field.name.replace(".", "|");
       id = "Width: " + safe_name;
       new_options[id] = {
-        label: "Width: " + field.label_short,
+        // label: "Width: " + field.label_short,
         default: null,
-        section: "Layout",
+        // section: "Layout",
         type: "number",
-        display: "range",
-        min: 5,
-        max: 400
+        // display: "range",
+        // min: 5,
+        // max: 400
       };
 
       // WIDTH ONLY FOR NOW
@@ -1044,7 +1046,7 @@ looker.plugins.visualizations.add({
         col_resize = {};
         col_resize["Width: " + column.column.definition.field] = column.column.width;
         console.log("col_resize", col_resize)
-        // this.trigger('updateConfig', [col_resize]);
+        vis.trigger('updateConfig', [col_resize]);
       },
 
       tooltips:function(cell){
