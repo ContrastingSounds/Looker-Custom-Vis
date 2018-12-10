@@ -45,9 +45,9 @@ looker.plugins.visualizations.add({
         default: null,
         section: "Layout",
         type: "number",
-        display: "number",
-        // min: 5,
-        // max: 400
+        display: "range",
+        min: 5,
+        max: 400
       };
       group_by_options.push("a"); // {field.label_short: safe_name}
 
@@ -80,9 +80,9 @@ looker.plugins.visualizations.add({
         default: null,
         section: "Layout",
         type: "number",
-        display: "number",
-        // min: 5,
-        // max: 400
+        display: "range",
+        min: 5,
+        max: 400
       };
 
       // WIDTH ONLY FOR NOW
