@@ -7,6 +7,7 @@ https://unpkg.com/liquidjs/dist/liquid.min.js
 
 html_tile_style = `
   .html-tile {
+    overflow: hidden;
     font-family: Open Sans,Helvetica,Arial,sans-serif;
     font-size: 12px;   
   }
