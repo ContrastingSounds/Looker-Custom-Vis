@@ -1,5 +1,28 @@
 // import * as $ from 'jquery'
 
+format_usd = {
+      decimal: ".",
+      thousand: ",",
+      symbol: "$",
+      precision: 2,
+};
+format_gbp = {
+      decimal: ".",
+      thousand: ",",
+      symbol: "£",
+      precision: 2,
+};
+format_dec_0 = {
+      decimal: ".",
+      thousand: ",",
+      precision: 0,
+};
+format_dec_2 = {
+      decimal: ".",
+      thousand: ",",
+      precision: 2,
+};
+
 themeFinanceTable = `
   /* Based on: Tabulator v4.1.3 (c) Oliver Folkerd */
   .tabulator {
@@ -772,34 +795,27 @@ themeFinanceTable = `
 
 // Global options
 global_options = {
-  font_size: {
-    section: "Font",
-    type: "string",
-    label: "Font",
-    values: [
-      {"Large": "large"},
-      {"Small": "small"}
-    ],
-    display: "radio",
-    default: "large"
-  },
-  spacer_cols: {
-    // section: "Layout", 
+  use_grouping: {
+    section: "Data",
     type: "boolean",
+    label: "Use Grouping",
+    default: "true"
+  },
+  // spacer_cols: {
+    // section: "Layout", 
     // label: "Add Spacers",
-    default: true
-  }
+  //   type: "boolean",
+  //   default: true
+  // }
 }
 
 looker.plugins.visualizations.add({
   options: global_options,
 
   create: function(element, config) {
-    // Create a style element for the page
     this.style = document.createElement('style')
     document.head.appendChild(this.style)
 
-    // Create a container element for the table
     var container = element.appendChild(document.createElement("div"));
     container.id = "finance-tabulator";
   },
@@ -813,31 +829,25 @@ looker.plugins.visualizations.add({
       safe_name = field.name.replace(".", "|");
       id = "Width: " + safe_name;
       new_options[id] = {
-        // label: "Width: " + field.label_short,
         default: null,
-        // section: "Layout",
         type: "number",
-        // display: "range",
-        // min: 5,
-        // max: 400
       };
-      group_by_options.push("a"); // {field.label_short: safe_name}
+      group_option = {};
+      group_option[field.label_short] = safe_name
+      group_by_options.push(group_option); // {field.label_short: safe_name}
 
       // WIDTH ONLY FOR NOW
       //
       // id = "Order: " + safe_name
       // new_options[id] = {
-      //   label: "Order: " + field.label_short,
       //   default: null,
-      //   section: "Layout",
       //   type: "number",
-      //   display: "number"
       // }
     });
 
     new_options["group_by"] = {
       section: "Data",
-      type: "array",
+      type: "string",
       label: "Group By",
       values: group_by_options,
       display: "select",
@@ -960,32 +970,40 @@ looker.plugins.visualizations.add({
         }
 
         if (mea_object.type == "sum") {
-          mea_definition["bottomCalc"] = "sum"
+          mea_definition["bottomCalc"] = "sum";
         }
         else if (mea_object.type == "average") {
-          mea_definition["bottomCalc"] = "avg"
+          mea_definition["bottomCalc"] = "avg";
         }
         else if (mea_object.type == "average_distinct") {
-          mea_definition["bottomCalc"] = "avg"
+          mea_definition["bottomCalc"] = "avg";
         }
 
         if (mea_object.value_format != null) {
+          mea_definition["formatter"] = "money"
+          mea_definition["bottomCalcFormatter"] = "money"
           if (mea_object.value_format.indexOf("$") !== -1) {
-            mea_definition["formatter"] = "money"
-            mea_definition["formatterParams"] = {
-                  decimal: ".",
-                  thousand: ",",
-                  symbol: "$",
-                  // symbolAfter:"p", 
-                  precision: 2,
-            }
+            mea_definition["formatterParams"] = format_usd
+            mea_definition["bottomCalcFormatterParams"] = format_usd
+          }
+          else if (mea_object.value_format.indexOf("£") !== -1) {
+            mea_definition["formatterParams"] = format_gbp
+            mea_definition["bottomCalcFormatterParams"] = format_gbp
+          }
+          else if (mea_object.value_format.indexOf(".") !== -1) {
+            mea_definition["formatterParams"] = format_dec_2
+            mea_definition["bottomCalcFormatterParams"] = format_dec_2
+          }
+          else {
+            mea_definition["formatterParams"] = format_dec_0
+            mea_definition["bottomCalcFormatterParams"] = format_dec_0
           }
         }
 
         if (config["Width: " + safe_name] != null) {
           mea_definition["width"] = config["Width: " + safe_name]
         }
-        mea_details.push(mea_definition)
+        console.log(mea_definition)
     }
 
     for (j = 0; j < data.length; j++) {
@@ -1012,15 +1030,14 @@ looker.plugins.visualizations.add({
     console.log("table_col_details", table_col_details)
     console.log("tbl_data", tbl_data)
 
-    if (config.group_by != null) {
-      initial_sort = config.group_by
-    }
-    else {
-      initial_sort = table_col_details[0].field
-    }
+    console.log("config.use_grouping", config.use_grouping)
+    if (config.use_grouping == true) {
+        group_by = config.group_by
+    } else {
+        group_by = null
+    };
 
-    group_by = table_col_details[0].field
-    // var vis= this 
+    initial_sort = table_col_details[0].field;
 
     var tbl = $("#finance-tabulator").tabulator({
       nestedFieldSeparator:"~", //change the field separator character to a pipe
@@ -1028,11 +1045,9 @@ looker.plugins.visualizations.add({
       layout:"fitDataFill",      // fit columns to data, but also fill full table width
       // responsiveLayout: "hide",  //hide columns that dont fit on the table
       tooltips: true,            //show tool tips on cells
-      addRowPos: "top",          //when adding a new row, add it to the top of the table
-      history: true,             //allow undo and redo actions on the table
       pagination: false, //"local",       //paginate the data
       paginationSize: 10,         //allow 7 rows per page of data
-      movableColumns: true,      //allow column order to be changed
+      movableColumns: false,      //allow column order to be changed
       resizableColumns: true,
       resizableRows: false,       //allow row size to be changed
       groupBy: group_by,
@@ -1053,7 +1068,7 @@ looker.plugins.visualizations.add({
           //cell - cell component
 
           //function should return a string for the tooltip of false to hide the tooltip
-          return  cell.getColumn().getField() + " - " + cell.getValue(); //return cells "field - value";
+          return  cell.getColumn().getDefinition().title + ": " + cell.getValue(); //return cells "field - value";
       },
     });
 
