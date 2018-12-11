@@ -51,7 +51,7 @@ themeFinanceTable = `
     position: relative;
     box-sizing: border-box;
     width: 100%;
-    border-bottom: 1px solid #999;
+    border-bottom: 1px solid #000; /* #999 */
     background-color: #fff;
     color: #555;
     font-weight: bold;
@@ -302,15 +302,15 @@ themeFinanceTable = `
 
   .tabulator .tabulator-tableHolder .tabulator-table .tabulator-row.tabulator-calcs {
     font-weight: bold;
-    background: #f2f2f2 !important;
+    background: #ffffff !important; /* #f2f2f2 */
   }
 
   .tabulator .tabulator-tableHolder .tabulator-table .tabulator-row.tabulator-calcs.tabulator-calcs-top {
-    border-bottom: 2px solid #ddd;
+    border-bottom: 2px solid #ddd; 
   }
 
   .tabulator .tabulator-tableHolder .tabulator-table .tabulator-row.tabulator-calcs.tabulator-calcs-bottom {
-    border-top: 2px solid #ddd;
+    border-top: 2px solid #000;
   }
 
   .tabulator .tabulator-col-resize-handle {
@@ -700,7 +700,7 @@ themeFinanceTable = `
     border-top: 1px solid #999;
     padding: 5px;
     padding-left: 10px;
-    background: #fafafa;
+    background: #ffffff;     /* #fafafa */
     font-weight: bold;
     min-width: 100%;
   }
@@ -1003,7 +1003,8 @@ looker.plugins.visualizations.add({
         if (config["Width: " + safe_name] != null) {
           mea_definition["width"] = config["Width: " + safe_name]
         }
-        console.log(mea_definition)
+
+        mea_details.push(mea_definition)
     }
 
     for (j = 0; j < data.length; j++) {
@@ -1051,6 +1052,15 @@ looker.plugins.visualizations.add({
       resizableColumns: true,
       resizableRows: false,       //allow row size to be changed
       groupBy: group_by,
+      groupHeader:function(value, count, data, group){
+          //value - the value all members of this group share
+          //count - the number of rows in this group
+          //data - an array of all the row data objects in this group
+          //group - the group component for the group
+
+          return value + "<span style='color:#d00; margin-left:10px;'>(" + count + " item)</span>";
+      },
+      
       initialSort:[             //set the initial sort order of the data
         {column: initial_sort, dir:"asc"},
       ],
