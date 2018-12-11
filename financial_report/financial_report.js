@@ -969,13 +969,10 @@ looker.plugins.visualizations.add({
           align: mea_object.align,
         }
 
-        if (mea_object.type == "sum") {
+        if (["sum", "count", "count_distinct"].includes(mea_object.type)) {
           mea_definition["bottomCalc"] = "sum";
         }
-        else if (mea_object.type == "average") {
-          mea_definition["bottomCalc"] = "avg";
-        }
-        else if (mea_object.type == "average_distinct") {
+        else if (["average", "average_distinct"].includes(mea_object.type)) {
           mea_definition["bottomCalc"] = "avg";
         }
 
@@ -989,6 +986,16 @@ looker.plugins.visualizations.add({
           else if (mea_object.value_format.indexOf("£") !== -1) {
             mea_definition["formatterParams"] = format_gbp
             mea_definition["bottomCalcFormatterParams"] = format_gbp
+          }
+          else if (mea_object.value_format == "percent_2") {
+            mea_definition["formatter"] = function(cell, formatterParams, onRendered){
+              //cell - the cell component
+              //formatterParams - parameters set for the column
+              //onRendered - function to call when the formatter has been rendered
+              rendered_value = 100 * cell.getValue() + '%';
+
+              return rendered_value; //return the contents of the cell;  
+            }        
           }
           else if (mea_object.value_format.indexOf(".") !== -1) {
             mea_definition["formatterParams"] = format_dec_2
@@ -1060,7 +1067,7 @@ looker.plugins.visualizations.add({
 
           return value + "<span style='color:#d00; margin-left:10px;'>(" + count + " item)</span>";
       },
-      
+
       initialSort:[             //set the initial sort order of the data
         {column: initial_sort, dir:"asc"},
       ],
