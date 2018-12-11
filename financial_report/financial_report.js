@@ -1,5 +1,3 @@
-// import * as $ from 'jquery'
-
 format_usd = {
       decimal: ".",
       thousand: ",",
@@ -21,6 +19,10 @@ format_dec_2 = {
       decimal: ".",
       thousand: ",",
       precision: 2,
+};
+format_percent_2 = function(cell, formatterParams, onRendered){
+  rendered_value = (100 * cell.getValue()).toFixed(2).toString() + '%';
+  return rendered_value; //return the contents of the cell;  
 };
 
 themeFinanceTable = `
@@ -801,15 +803,10 @@ global_options = {
     label: "Use Grouping",
     default: "true"
   },
-  // spacer_cols: {
-    // section: "Layout", 
-    // label: "Add Spacers",
-  //   type: "boolean",
-  //   default: true
-  // }
 }
 
 looker.plugins.visualizations.add({
+
   options: global_options,
 
   create: function(element, config) {
@@ -834,15 +831,7 @@ looker.plugins.visualizations.add({
       };
       group_option = {};
       group_option[field.label_short] = safe_name
-      group_by_options.push(group_option); // {field.label_short: safe_name}
-
-      // WIDTH ONLY FOR NOW
-      //
-      // id = "Order: " + safe_name
-      // new_options[id] = {
-      //   default: null,
-      //   type: "number",
-      // }
+      group_by_options.push(group_option);
     });
 
     new_options["group_by"] = {
@@ -858,25 +847,10 @@ looker.plugins.visualizations.add({
       safe_name = field.name.replace(".", "|");
       id = "Width: " + safe_name;
       new_options[id] = {
-        // label: "Width: " + field.label_short,
         default: null,
-        // section: "Layout",
         type: "number",
-        // display: "range",
-        // min: 5,
-        // max: 400
       };
 
-      // WIDTH ONLY FOR NOW
-      //
-      // id = "Order: " + safe_name
-      // new_options[id] = {
-      //   label: "Order: " + field.label_short,
-      //   default: null,
-      //   section: "Layout",
-      //   type: "number",
-      //   display: "number"
-      // }
     });
 
     this.trigger('registerOptions', new_options); // register options with parent page to update visConfig
@@ -932,6 +906,7 @@ looker.plugins.visualizations.add({
         dim_details.push(dim_definition)
     }
 
+    // BUILD TABLE DATA ARRAY
     for (j = 0; j < data.length; j++) {
       var row = {id: j};
 
@@ -945,73 +920,67 @@ looker.plugins.visualizations.add({
       tbl_data.push(row)
     }
 
-    // spacer_definition = {
-    //   title: "",
-    //   field: "dim_mea_spacer",
-    //   width: 10,
-    // };
-    // dim_details.push(spacer_definition);
-
     // HANDLE MEASURES
     var mea_names = []
     var mea_details = []
 
     for (var i = 0; i < queryResponse.fields.measure_like.length; i++) {
-        var mea_name = queryResponse.fields.measure_like[i].name
-        mea_names.push(mea_name)
+      var mea_name = queryResponse.fields.measure_like[i].name
+      mea_names.push(mea_name)
+      
+      var safe_name = mea_name.replace(".", "|")
+      var mea_object = queryResponse.fields.measure_like[i]
+
+      mea_definition = {
+        title: mea_object.label_short,
+        field: safe_name,
+        align: mea_object.align,
+      }
+
+      if (["sum", "count", "count_distinct"].includes(mea_object.type)) {
+        mea_definition["bottomCalc"] = "sum";
+      }
+      else if (["average", "average_distinct"].includes(mea_object.type)) {
+        mea_definition["bottomCalc"] = "avg";
+      }
+
+      if (mea_object.value_format != null) {
+        console.log("mea_object.value_format", mea_object.value_format)
         
-        var safe_name = mea_name.replace(".", "|")
-        var mea_object = queryResponse.fields.measure_like[i]
-
-        mea_definition = {
-          title: mea_object.label_short,
-          field: safe_name,
-          align: mea_object.align,
-        }
-
-        if (["sum", "count", "count_distinct"].includes(mea_object.type)) {
-          mea_definition["bottomCalc"] = "sum";
-        }
-        else if (["average", "average_distinct"].includes(mea_object.type)) {
-          mea_definition["bottomCalc"] = "avg";
-        }
-
-        if (mea_object.value_format != null) {
+        if (mea_object.value_format.indexOf("$") !== -1) {
           mea_definition["formatter"] = "money"
           mea_definition["bottomCalcFormatter"] = "money"
-          if (mea_object.value_format.indexOf("$") !== -1) {
-            mea_definition["formatterParams"] = format_usd
-            mea_definition["bottomCalcFormatterParams"] = format_usd
-          }
-          else if (mea_object.value_format.indexOf("£") !== -1) {
-            mea_definition["formatterParams"] = format_gbp
-            mea_definition["bottomCalcFormatterParams"] = format_gbp
-          }
-          else if (mea_object.value_format == "percent_2") {
-            mea_definition["formatter"] = function(cell, formatterParams, onRendered){
-              //cell - the cell component
-              //formatterParams - parameters set for the column
-              //onRendered - function to call when the formatter has been rendered
-              rendered_value = 100 * cell.getValue() + '%';
-
-              return rendered_value; //return the contents of the cell;  
-            }        
-          }
-          else if (mea_object.value_format.indexOf(".") !== -1) {
-            mea_definition["formatterParams"] = format_dec_2
-            mea_definition["bottomCalcFormatterParams"] = format_dec_2
-          }
-          else {
-            mea_definition["formatterParams"] = format_dec_0
-            mea_definition["bottomCalcFormatterParams"] = format_dec_0
-          }
+          mea_definition["formatterParams"] = format_usd
+          mea_definition["bottomCalcFormatterParams"] = format_usd
         }
-
-        if (config["Width: " + safe_name] != null) {
-          mea_definition["width"] = config["Width: " + safe_name]
+        else if (mea_object.value_format.indexOf("£") !== -1) {
+          mea_definition["formatter"] = "money"
+          mea_definition["bottomCalcFormatter"] = "money"
+          mea_definition["formatterParams"] = format_gbp
+          mea_definition["bottomCalcFormatterParams"] = format_gbp
         }
+        else if (mea_object.value_format.indexOf("%") !== -1) {
+          mea_definition["formatter"] = format_percent_2;        
+        }
+        else if (mea_object.value_format.indexOf(".") !== -1) {
+          mea_definition["formatter"] = "money"
+          mea_definition["bottomCalcFormatter"] = "money"
+          mea_definition["formatterParams"] = format_dec_2
+          mea_definition["bottomCalcFormatterParams"] = format_dec_2
+        }
+        else {
+          mea_definition["formatter"] = "money"
+          mea_definition["bottomCalcFormatter"] = "money"
+          mea_definition["formatterParams"] = format_dec_0
+          mea_definition["bottomCalcFormatterParams"] = format_dec_0
+        }
+      }
 
-        mea_details.push(mea_definition)
+      if (config["Width: " + safe_name] != null) {
+        mea_definition["width"] = config["Width: " + safe_name]
+      }
+
+      mea_details.push(mea_definition)
     }
 
     for (j = 0; j < data.length; j++) {
@@ -1019,26 +988,16 @@ looker.plugins.visualizations.add({
           var raw_name = mea_names[i]
           var safe_name = mea_names[i].replace(".", "|")
           
-          // CODE TO USE RENDERED VALUE .. MIGHT WANT TO KEEP RAW FOR CALCS
-          //
-          // returned_value = data[j][raw_name]
-          // if (returned_value.rendered != null) {
-          //   tbl_data[j][safe_name] = returned_value.rendered
-          // } else {
-          //   tbl_data[j][safe_name] = returned_value.value;
-          // }
           tbl_data[j][safe_name] = data[j][raw_name].value;
       }
     }
 
-    table_col_names = dim_names.concat(mea_names)
     table_col_details = dim_details.concat(mea_details)
 
     // DEBUG CHECK
     console.log("table_col_details", table_col_details)
     console.log("tbl_data", tbl_data)
 
-    console.log("config.use_grouping", config.use_grouping)
     if (config.use_grouping == true) {
         group_by = config.group_by
     } else {
@@ -1048,18 +1007,21 @@ looker.plugins.visualizations.add({
     initial_sort = table_col_details[0].field;
 
     var tbl = $("#finance-tabulator").tabulator({
-      nestedFieldSeparator:"~", //change the field separator character to a pipe
       data: tbl_data,           //load row data from array
       layout:"fitDataFill",      // fit columns to data, but also fill full table width
       // responsiveLayout: "hide",  //hide columns that dont fit on the table
+      
       tooltips: true,            //show tool tips on cells
+      
       pagination: false, //"local",       //paginate the data
       paginationSize: 10,         //allow 7 rows per page of data
+      
       movableColumns: false,      //allow column order to be changed
       resizableColumns: true,
       resizableRows: false,       //allow row size to be changed
+      
       groupBy: group_by,
-      groupHeader:function(value, count, data, group){
+      groupHeader: function(value, count, data, group) {
           //value - the value all members of this group share
           //count - the number of rows in this group
           //data - an array of all the row data objects in this group
@@ -1068,24 +1030,18 @@ looker.plugins.visualizations.add({
           return value + "<span style='color:#d00; margin-left:10px;'>(" + count + " item)</span>";
       },
 
-      initialSort:[             //set the initial sort order of the data
-        {column: initial_sort, dir:"asc"},
-      ],
+      initialSort: [ {column: initial_sort, dir:"asc"} ],
       columns: table_col_details,
 
-      columnResized: function(column){
-        // console.log("column", column);
+      columnResized: function(column) {
         col_resize = {};
         col_resize["Width: " + column.column.definition.field] = column.column.width;
-        console.log("col_resize", col_resize)
         vis.trigger('updateConfig', [col_resize]);
       },
 
-      tooltips:function(cell){
-          //cell - cell component
-
-          //function should return a string for the tooltip of false to hide the tooltip
-          return  cell.getColumn().getDefinition().title + ": " + cell.getValue(); //return cells "field - value";
+      tooltips: function(cell) {
+          //function should return a string for the tooltip or false to hide the tooltip
+          return  cell.getColumn().getDefinition().title + ": " + cell.getValue(); 
       },
     });
 
