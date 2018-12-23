@@ -849,6 +849,48 @@ updateOptionsPanel = function(vis, dimensions, measures) {
   vis.trigger('registerOptions', new_options); // register options with parent page to update visConfig  
 }
 
+buildDimensionNamesArray = function(dimensions) {
+  dim_names = []
+  for (var i = 0; i < dimensions.length; i++) {
+    dim_names.push(dimensions[i].name)
+  }
+  return dim_names
+}
+
+buildDimensionDefinitions = function(dimensions, config) {
+  dim_details = []
+  for (var i = 0; i < dimensions.length; i++) {
+      dim_definition = {
+        title: dimensions[i].label_short,
+        field: dimensions[i].name.replace(".", "|"),
+        align: dimensions[i].align,
+        // frozen: true,
+      }
+
+      if (config["Width: " + safe_name] != null) {
+        dim_definition["width"] = config["Width: " + safe_name]
+      }
+      dim_details.push(dim_definition)
+  }
+  return dim_details  
+}
+
+buildTableSpine = function(data, dim_names) {
+  var tbl_data = []
+  for (j = 0; j < data.length; j++) {
+    var row = {id: j};
+
+    for (var i = 0; i < dim_names.length; i++) {
+        var raw_name = dim_names[i]
+        var safe_name = raw_name.replace(".", "|")
+        
+        row[safe_name] = data[j][raw_name].value
+    }
+    tbl_data.push(row)
+  }
+  return tbl_data  
+}
+
 insertColumnGroup = function(group, branch, index, iteration=1) {
   // console.log("insertColumnGroup, depth:", iteration);
   // console.log("--group:", group);
@@ -953,6 +995,113 @@ buildMeasuresTree = function(pivot_fields, pivot_index, measures) {
   return column_tree[0]
 }
 
+buildMeasureNamesArray = function(measures) {
+  mea_names = []
+  for (var i = 0; i < measures.length; i++) {
+    mea_names.push(measures[i].name)
+  }
+  return mea_names
+}
+
+buildMeasuresFlat = function(measures, config) {
+  var mea_names = []
+  var mea_details = []
+  
+  for (var i = 0; i < measures.length; i++) {
+    var mea_name = measures[i].name
+    mea_names.push(mea_name)
+    
+    var safe_name = mea_name.replace(".", "|")
+    var mea_object = measures[i]
+
+    mea_definition = {
+      title: mea_object.label_short,
+      field: safe_name,
+      align: mea_object.align,
+    }
+
+    if (["sum", "count", "count_distinct"].includes(mea_object.type)) {
+      mea_definition["bottomCalc"] = "sum";
+    }
+    else if (["average", "average_distinct"].includes(mea_object.type)) {
+      mea_definition["bottomCalc"] = "avg";
+    }
+
+    if (mea_object.value_format != null) {        
+      if (mea_object.value_format.indexOf("$") !== -1) {
+        mea_definition["formatter"] = "money"
+        mea_definition["bottomCalcFormatter"] = "money"
+        mea_definition["formatterParams"] = format_usd
+        mea_definition["bottomCalcFormatterParams"] = format_usd
+      }
+      else if (mea_object.value_format.indexOf("£") !== -1) {
+        mea_definition["formatter"] = "money"
+        mea_definition["bottomCalcFormatter"] = "money"
+        mea_definition["formatterParams"] = format_gbp
+        mea_definition["bottomCalcFormatterParams"] = format_gbp
+      }
+      else if (mea_object.value_format.indexOf("%") !== -1) {
+        mea_definition["formatter"] = format_percent_2;        
+      }
+      else if (mea_object.value_format.indexOf(".") !== -1) {
+        mea_definition["formatter"] = "money"
+        mea_definition["bottomCalcFormatter"] = "money"
+        mea_definition["formatterParams"] = format_dec_2
+        mea_definition["bottomCalcFormatterParams"] = format_dec_2
+      }
+      else {
+        mea_definition["formatter"] = "money"
+        mea_definition["bottomCalcFormatter"] = "money"
+        mea_definition["formatterParams"] = format_dec_0
+        mea_definition["bottomCalcFormatterParams"] = format_dec_0
+      }
+    }
+
+    if (config["Width: " + safe_name] != null) {
+      mea_definition["width"] = config["Width: " + safe_name]
+    }
+
+    mea_details.push(mea_definition)
+  }
+
+  return mea_details
+}
+
+updateDataTableWithMeasureValues = function(data, tbl_data, pivot_fields, mea_names) {
+  if (pivot_fields.length > 0) {
+    for (i = 0; i < data.length; i++) {
+      for (j = 0; j < pivot_index.length; j++) {
+        for (var k = 0; k < mea_names.length; k++) {
+          var pivot_name = pivot_index[j].key
+          var raw_name = mea_names[k]
+          var safe_name = pivot_name + '|' + mea_names[k].replace(".", "|")
+          // console.log("Measure pivot_name", pivot_name)
+          // console.log("Measure raw_name", raw_name)
+          // console.log("Measure safe_name", safe_name)
+          // console.log("Value Index", i, raw_name, pivot_name)
+          // console.log("Data row", data[i])
+
+          if (typeof data[i][raw_name][pivot_name] !== 'undefined') {
+            var data_value = data[i][raw_name][pivot_name].value
+            // console.log("Data value", data_value)
+            tbl_data[i][safe_name] = data_value;  
+          } else {
+            // console.log("Data value undefined")
+          }  
+        }          
+      }
+    }
+  } else {
+    for (j = 0; j < data.length; j++) {
+      for (var i = 0; i < mea_names.length; i++) {
+          var raw_name = mea_names[i]
+          var safe_name = mea_names[i].replace(".", "|")
+          
+          tbl_data[j][safe_name] = data[j][raw_name].value;
+      }
+    }
+  }
+}
 
 
 looker.plugins.visualizations.add({
@@ -969,6 +1118,17 @@ looker.plugins.visualizations.add({
   },
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
+    // Clear any errors from previous updates.
+    this.clearErrors();
+
+    // destory old viz if already exists
+    if ($("#finance-tabulator").hasClass("tabulator")) { 
+      $("#finance-tabulator").tabulator("destroy") 
+    }
+
+    // Set style (this could be made flexible as per https://github.com/looker/custom_visualizations_v2/blob/master/src/examples/subtotal/subtotal.ts)
+    this.style.innerHTML = themeFinanceTable
+
     // print data to console for debugging:
     // console.log("data", data);
     // console.log("config", config);
@@ -977,176 +1137,39 @@ looker.plugins.visualizations.add({
     console.log("pivot index", queryResponse.pivots);
 
     var vis = this;
-
-    // UPDATE OPTIONS PANEL
-    updateOptionsPanel(
-      vis, 
-      queryResponse.fields.dimension_like, 
-      queryResponse.fields.measure_like
-    );
-
-    // Clear any errors from previous updates.
-    this.clearErrors();
+    var dimensions = queryResponse.fields.dimension_like
+    var measures = queryResponse.fields.measure_like
 
     // Throw some errors and exit if the shape of the data isn't what this chart needs.
-    if (queryResponse.fields.dimensions.length == 0) {
+    if (dimensions.length == 0) {
       this.addError({title: "No Dimensions", message: "This chart requires dimensions."});
       return;
     }
 
-    // Set style (this could be made flexible as per https://github.com/looker/custom_visualizations_v2/blob/master/src/examples/subtotal/subtotal.ts)
-    this.style.innerHTML = themeFinanceTable
-
-    // destory old viz if already exists
-    if ($("#finance-tabulator").hasClass("tabulator")) { 
-      $("#finance-tabulator").tabulator("destroy") 
-    }
-
-    // Initialise data and meta-data structures
-    var tbl_data = []
+    // UPDATE OPTIONS PANEL
+    updateOptionsPanel(vis, dimensions, measures);
 
     // HANDLE DIMENSIONS
-    var dim_names = []    // list of raw dim names
-    var dim_details = []  // full objects for dims
-
-    for (var i = 0; i < queryResponse.fields.dimension_like.length; i++) {
-        var dim_name = queryResponse.fields.dimension_like[i].name
-        dim_names.push(dim_name)
-
-        var safe_name = dim_name.replace(".", "|")
-        var dim_object = queryResponse.fields.dimension_like[i]
-
-        dim_definition = {
-          title: dim_object.label_short,
-          field: safe_name,
-          align: dim_object.align,
-          // frozen: true,
-        }
-
-        if (config["Width: " + safe_name] != null) {
-          dim_definition["width"] = config["Width: " + safe_name]
-        }
-        dim_details.push(dim_definition)
-    }
-
-    // BUILD TABLE DATA ARRAY
-    for (j = 0; j < data.length; j++) {
-      var row = {id: j};
-
-      for (var i = 0; i < dim_names.length; i++) {
-          var raw_name = dim_names[i]
-          var safe_name = raw_name.replace(".", "|")
-          
-          row[safe_name] = data[j][raw_name].value
-      }
-
-      tbl_data.push(row)
-    }
+    var dim_names = buildDimensionNamesArray(dimensions);
+    var dim_details = buildDimensionDefinitions(dimensions, config);
+    var tbl_data = buildTableSpine(data, dim_names);
 
     // HANDLE MEASURES
     pivot_fields = config.query_fields.pivots;
     pivot_index = queryResponse.pivots;
     measures = queryResponse.fields.measure_like;
 
+    var mea_names = buildMeasureNamesArray(measures);
+
+    updateDataTableWithMeasureValues(data, tbl_data, pivot_fields, mea_names);
+
+    // Update columns array with measures information
     if (pivot_fields.length > 0) {
-      measures_tree = buildMeasuresTree(pivot_fields, pivot_index, measures)
-    }
-
-    var mea_names = []
-    var mea_details = []
-
-    for (var i = 0; i < measures.length; i++) {
-      var mea_name = measures[i].name
-      mea_names.push(mea_name)
-      
-      var safe_name = mea_name.replace(".", "|")
-      var mea_object = measures[i]
-
-      mea_definition = {
-        title: mea_object.label_short,
-        field: safe_name,
-        align: mea_object.align,
-      }
-
-      if (["sum", "count", "count_distinct"].includes(mea_object.type)) {
-        mea_definition["bottomCalc"] = "sum";
-      }
-      else if (["average", "average_distinct"].includes(mea_object.type)) {
-        mea_definition["bottomCalc"] = "avg";
-      }
-
-      if (mea_object.value_format != null) {        
-        if (mea_object.value_format.indexOf("$") !== -1) {
-          mea_definition["formatter"] = "money"
-          mea_definition["bottomCalcFormatter"] = "money"
-          mea_definition["formatterParams"] = format_usd
-          mea_definition["bottomCalcFormatterParams"] = format_usd
-        }
-        else if (mea_object.value_format.indexOf("£") !== -1) {
-          mea_definition["formatter"] = "money"
-          mea_definition["bottomCalcFormatter"] = "money"
-          mea_definition["formatterParams"] = format_gbp
-          mea_definition["bottomCalcFormatterParams"] = format_gbp
-        }
-        else if (mea_object.value_format.indexOf("%") !== -1) {
-          mea_definition["formatter"] = format_percent_2;        
-        }
-        else if (mea_object.value_format.indexOf(".") !== -1) {
-          mea_definition["formatter"] = "money"
-          mea_definition["bottomCalcFormatter"] = "money"
-          mea_definition["formatterParams"] = format_dec_2
-          mea_definition["bottomCalcFormatterParams"] = format_dec_2
-        }
-        else {
-          mea_definition["formatter"] = "money"
-          mea_definition["bottomCalcFormatter"] = "money"
-          mea_definition["formatterParams"] = format_dec_0
-          mea_definition["bottomCalcFormatterParams"] = format_dec_0
-        }
-      }
-
-      if (config["Width: " + safe_name] != null) {
-        mea_definition["width"] = config["Width: " + safe_name]
-      }
-
-      mea_details.push(mea_definition)
-    }
-
-    if (pivot_fields.length > 0) {
-      for (i = 0; i < data.length; i++) {
-        for (j = 0; j < pivot_index.length; j++) {
-          for (var k = 0; k < mea_names.length; k++) {
-            var pivot_name = pivot_index[j].key
-            var raw_name = mea_names[k]
-            var safe_name = pivot_name + '|' + mea_names[k].replace(".", "|")
-            // console.log("Measure pivot_name", pivot_name)
-            // console.log("Measure raw_name", raw_name)
-            // console.log("Measure safe_name", safe_name)
-            // console.log("Value Index", i, raw_name, pivot_name)
-            // console.log("Data row", data[i])
-
-            if (typeof data[i][raw_name][pivot_name] !== 'undefined') {
-              var data_value = data[i][raw_name][pivot_name].value
-              // console.log("Data value", data_value)
-              tbl_data[i][safe_name] = data_value;  
-            } else {
-              // console.log("Data value undefined")
-            }  
-          }          
-        }
-      }
-      table_col_details = dim_details.concat(measures_tree.columns)
+      mea_details = buildMeasuresTree(pivot_fields, pivot_index, measures)
     } else {
-      for (j = 0; j < data.length; j++) {
-        for (var i = 0; i < mea_names.length; i++) {
-            var raw_name = mea_names[i]
-            var safe_name = mea_names[i].replace(".", "|")
-            
-            tbl_data[j][safe_name] = data[j][raw_name].value;
-        }
-      }
-      table_col_details = dim_details.concat(mea_details) 
+      mea_details = buildMeasuresFlat(measures, config);
     }
+    table_col_details = dim_details.concat(mea_details) 
 
     // DEBUG CHECK
     console.log("table_col_details", table_col_details)
