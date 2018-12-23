@@ -22,7 +22,7 @@ format_dec_2 = {
 };
 format_percent_2 = function(cell, formatterParams, onRendered){
   rendered_value = (100 * cell.getValue()).toFixed(2).toString() + '%';
-  return rendered_value; //return the contents of the cell;  
+  return rendered_value; 
 };
 
 themeFinanceTable = `
@@ -805,11 +805,60 @@ global_options = {
   },
 }
 
+// function to get arbitrary nest array
+// https://hackernoon.com/accessing-nested-objects-in-javascript-f02f1bd6387f
+const getNestedObject = (nestedObj, pathArr) => {
+    return pathArr.reduce((obj, key) =>
+        (obj && obj[key] !== 'undefined') ? obj[key] : undefined, nestedObj);
+}
+
+insertColumnGroup = function(group, branch, index, iteration=1) {
+  // console.log("insertColumnGroup, depth:", iteration);
+  // console.log("--group:", group);
+  // console.log("--branch:", branch);
+  // console.log("--index:", index);
+
+  if (iteration == index.length) {
+    insert_point = index[index.length - 1];
+    // console.log('--insert_point:', insert_point);
+    branch.columns.push(group);
+    // console.log("column_tree:", column_tree)
+  } else {
+    branch_index = index[iteration - 1];
+    // console.log('--Going further. branch_index:', branch_index);
+    sub_branch = branch.columns[branch_index];
+    // console.log('--sub_branch', sub_branch);
+    insertColumnGroup(group, sub_branch, index, iteration + 1);
+  }
+}
+
+insertMeasuresArray = function(measures_array, branch, index, iteration=1) {
+  // console.log("insertMeasuresArray, depth:", iteration);
+  // console.log("--measures_array:", measures_array);
+  // console.log("--branch:", branch);
+  // console.log("--index:", index);
+
+  if (iteration == index.length) {
+    insert_point = index[index.length - 1];
+    // console.log('--insert_point:', insert_point);
+    branch.columns = measures_array;
+    // console.log("column_tree:", column_tree)     
+  } else {
+    branch_index = index[iteration - 1];
+    // console.log('--Going further. branch_index:', branch_index);
+    sub_branch = branch.columns[branch_index];
+    // console.log('--sub_branch', sub_branch);
+    insertMeasuresArray(measures_array, sub_branch, index, iteration + 1);    
+  }
+}
+
+
 looker.plugins.visualizations.add({
 
   options: global_options,
 
   create: function(element, config) {
+    console.log("create function called");
     this.style = document.createElement('style')
     document.head.appendChild(this.style)
 
@@ -818,6 +867,82 @@ looker.plugins.visualizations.add({
   },
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
+    // print data to console for debugging:
+    // console.log("data", data);
+    // console.log("config", config);
+    console.log("queryResponse", queryResponse);
+    console.log("pivot fields", config.query_fields.pivots);
+    console.log("pivot index", queryResponse.pivots);
+
+    pivot_fields = config.query_fields.pivots;
+    pivot_index = queryResponse.pivots;
+    measures = queryResponse.fields.measure_like;
+
+    if (pivot_fields.length > 0) {
+      for (i = 0; i < pivot_fields.length; i++) {
+        // console.log(i, pivot_fields[i].name)
+      }
+
+      // Initialise tree
+      // column_idx: array indices so that columns and groups can be added at right place
+      // column_latest: most recent value seen for a pivot field
+      column_tree = [
+        {
+          title: "PIVOTED MEASURES",
+          columns: []
+        }
+      ];
+      column_idx = [];
+      column_latest = [];
+      for (j = 0; j < pivot_fields.length; j++) {
+        column_idx[j] = -1;
+        column_latest[j] = null;
+      }    
+
+      for (i = 0; i < pivot_index.length; i++) {
+        for (j = 0; j < pivot_fields.length; j++) {
+          current_pivot_value = pivot_index[i].data[pivot_fields[j].name];
+          if (current_pivot_value != column_latest[j]) {
+            column_idx[j]++;
+            for (k = j + 1; k < pivot_fields.length; k++) {
+              column_idx[k] = -1;
+            }
+            column_latest[j] = current_pivot_value;
+
+            tree_index = column_idx.slice(0, j + 1);
+            new_column_group = {
+              title: current_pivot_value,
+              columns: []
+            }
+            // console.log('ADDING NEW COLUMN GROUP AT PIVOT INDEX', i)
+            insertColumnGroup(new_column_group, column_tree[0], tree_index);
+          }
+
+          // If final pivot, push measures into the final column group
+          if (j + 1 == pivot_fields.length) {
+            tree_index = column_idx.concat([0])
+            
+          }
+        }
+
+        // Once we have the indices for the current column group, push in all the measures
+        measures_array = []
+        for (m = 0; m < measures.length; m++) {
+          safe_name = pivot_index[i].key + '|' + measures[m].name.replace(".", "|");
+          mea_definition = {
+            title: measures[m].label_short,
+            field: safe_name,
+            align: measures[m].align,
+          }
+          measures_array.push(mea_definition)
+        }
+        insertMeasuresArray(measures_array, column_tree[0], tree_index) 
+      }
+      // console.log("COLUMN_TREE AT END OF PIVOT INDEX:", i, column_tree);      
+    }
+
+
+
     var vis = this;
 
     new_options = global_options
@@ -830,7 +955,7 @@ looker.plugins.visualizations.add({
         type: "number",
       };
       group_option = {};
-      group_option[field.label_short] = safe_name
+      group_option[field.label_short] = safe_name;
       group_by_options.push(group_option);
     });
 
@@ -863,13 +988,6 @@ looker.plugins.visualizations.add({
       this.addError({title: "No Dimensions", message: "This chart requires dimensions."});
       return;
     }
-
-    // print data to console for debugging:
-    console.log("data", data);
-    // console.log("element", element); 
-    console.log("config", config);
-    // console.log("details", details);
-    console.log("queryResponse", queryResponse);
 
     // Set style (this could be made flexible as per https://github.com/looker/custom_visualizations_v2/blob/master/src/examples/subtotal/subtotal.ts)
     this.style.innerHTML = themeFinanceTable
@@ -921,6 +1039,9 @@ looker.plugins.visualizations.add({
     }
 
     // HANDLE MEASURES
+    // 1. Build definitions - this is taken from the measure_like array
+    // 2. If table is not pivoted, can just append measures
+    // 3. If table is pivoted, need to construct new references
     var mea_names = []
     var mea_details = []
 
@@ -944,9 +1065,7 @@ looker.plugins.visualizations.add({
         mea_definition["bottomCalc"] = "avg";
       }
 
-      if (mea_object.value_format != null) {
-        console.log("mea_object.value_format", mea_object.value_format)
-        
+      if (mea_object.value_format != null) {        
         if (mea_object.value_format.indexOf("$") !== -1) {
           mea_definition["formatter"] = "money"
           mea_definition["bottomCalcFormatter"] = "money"
@@ -983,16 +1102,41 @@ looker.plugins.visualizations.add({
       mea_details.push(mea_definition)
     }
 
-    for (j = 0; j < data.length; j++) {
-      for (var i = 0; i < mea_names.length; i++) {
-          var raw_name = mea_names[i]
-          var safe_name = mea_names[i].replace(".", "|")
-          
-          tbl_data[j][safe_name] = data[j][raw_name].value;
-      }
-    }
+    if (pivot_fields.length > 0) {
+      for (i = 0; i < data.length; i++) {
+        for (j = 0; j < pivot_index.length; j++) {
+          for (var k = 0; k < mea_names.length; k++) {
+            var pivot_name = pivot_index[j].key
+            var raw_name = mea_names[k]
+            var safe_name = pivot_name + '|' + mea_names[k].replace(".", "|")
+            // console.log("Measure pivot_name", pivot_name)
+            // console.log("Measure raw_name", raw_name)
+            // console.log("Measure safe_name", safe_name)
+            // console.log("Value Index", i, raw_name, pivot_name)
+            // console.log("Data row", data[i])
 
-    table_col_details = dim_details.concat(mea_details)
+            if (typeof data[i][raw_name][pivot_name] !== 'undefined') {
+              var data_value = data[i][raw_name][pivot_name].value
+              // console.log("Data value", data_value)
+              tbl_data[i][safe_name] = data_value;  
+            } else {
+              // console.log("Data value undefined")
+            }  
+          }          
+        }
+      }
+      table_col_details = dim_details.concat(column_tree[0].columns)
+    } else {
+      for (j = 0; j < data.length; j++) {
+        for (var i = 0; i < mea_names.length; i++) {
+            var raw_name = mea_names[i]
+            var safe_name = mea_names[i].replace(".", "|")
+            
+            tbl_data[j][safe_name] = data[j][raw_name].value;
+        }
+      }
+      table_col_details = dim_details.concat(mea_details) 
+    }
 
     // DEBUG CHECK
     console.log("table_col_details", table_col_details)
