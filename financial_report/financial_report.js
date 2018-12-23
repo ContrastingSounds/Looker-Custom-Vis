@@ -1,3 +1,5 @@
+debug = false;
+
 format_usd = {
       decimal: ".",
       thousand: ",",
@@ -860,8 +862,13 @@ buildDimensionNamesArray = function(dimensions) {
 buildDimensionDefinitions = function(dimensions, config) {
   dim_details = []
   for (var i = 0; i < dimensions.length; i++) {
+      if (dimensions[i].hasOwnProperty("label_short")) {
+        dimension_title = dimensions[i].label_short
+      } else {
+        dimension_title = dimensions[i].label
+      }
       dim_definition = {
-        title: dimensions[i].label_short,
+        title: dimension_title,
         field: dimensions[i].name.replace(".", "|"),
         align: dimensions[i].align,
         // frozen: true,
@@ -892,48 +899,57 @@ buildTableSpine = function(data, dim_names) {
 }
 
 insertColumnGroup = function(group, branch, index, iteration=1) {
-  // console.log("insertColumnGroup, depth:", iteration);
-  // console.log("--group:", group);
-  // console.log("--branch:", branch);
-  // console.log("--index:", index);
+  if (debug) {
+    console.log("insertColumnGroup, depth:", iteration);
+    console.log("--group:", group);
+    console.log("--branch:", branch);
+    console.log("--index:", index);   
+  }
 
   if (iteration == index.length) {
     insert_point = index[index.length - 1];
-    // console.log('--insert_point:', insert_point);
+    if (debug) { console.log('--insert_point:', insert_point) };
+
     branch.columns.push(group);
-    // console.log("column_tree:", column_tree)
+    if (debug) { console.log("column_tree:", column_tree) };
   } else {
     branch_index = index[iteration - 1];
-    // console.log('--Going further. branch_index:', branch_index);
+    if (debug) { console.log('--Going further. branch_index:', branch_index); }
+
     sub_branch = branch.columns[branch_index];
-    // console.log('--sub_branch', sub_branch);
+    if (debug) { console.log('--sub_branch', sub_branch); }
+
     insertColumnGroup(group, sub_branch, index, iteration + 1);
   }
 }
 
 insertMeasuresArray = function(measures_array, branch, index, iteration=1) {
-  // console.log("insertMeasuresArray, depth:", iteration);
-  // console.log("--measures_array:", measures_array);
-  // console.log("--branch:", branch);
-  // console.log("--index:", index);
+  if (debug) {
+    console.log("insertMeasuresArray, depth:", iteration);
+    console.log("--measures_array:", measures_array);
+    console.log("--branch:", branch);
+    console.log("--index:", index);
+  }
 
   if (iteration == index.length) {
     insert_point = index[index.length - 1];
-    // console.log('--insert_point:', insert_point);
+    if (debug) { console.log('--insert_point:', insert_point); }
+
     branch.columns = measures_array;
-    // console.log("column_tree:", column_tree)     
+    if (debug) { console.log("column_tree:", column_tree); }
   } else {
     branch_index = index[iteration - 1];
-    // console.log('--Going further. branch_index:', branch_index);
+    if (debug) { console.log('--Going further. branch_index:', branch_index); }
+
     sub_branch = branch.columns[branch_index];
-    // console.log('--sub_branch', sub_branch);
+    if (debug) { console.log('--sub_branch', sub_branch); }
     insertMeasuresArray(measures_array, sub_branch, index, iteration + 1);    
   }
 }
 
 buildMeasuresTree = function(pivot_fields, pivot_index, measures) {
   for (i = 0; i < pivot_fields.length; i++) {
-    // console.log(i, pivot_fields[i].name)
+    if (debug) {  console.log(i, pivot_fields[i].name); }
   }
 
   // Initialise tree
@@ -953,46 +969,56 @@ buildMeasuresTree = function(pivot_fields, pivot_index, measures) {
   }    
 
   for (i = 0; i < pivot_index.length; i++) {
-    for (j = 0; j < pivot_fields.length; j++) {
-      current_pivot_value = pivot_index[i].data[pivot_fields[j].name];
-      if (current_pivot_value != column_latest[j]) {
-        column_idx[j]++;
-        for (k = j + 1; k < pivot_fields.length; k++) {
-          column_idx[k] = -1;
+    if (pivot_index[i].key != "$$$_row_total_$$$") {
+      for (j = 0; j < pivot_fields.length; j++) {
+        current_pivot_value = pivot_index[i].data[pivot_fields[j].name];
+        if (current_pivot_value != column_latest[j]) {
+          column_idx[j]++;
+          for (k = j + 1; k < pivot_fields.length; k++) {
+            column_idx[k] = -1;
+            column_latest[k] = null; // !!!!!!!!!!!!!!!
+          }
+          column_latest[j] = current_pivot_value;
+
+          tree_index = column_idx.slice(0, j + 1);
+          new_column_group = {
+            title: current_pivot_value,
+            columns: []
+          }
+          // console.log('ADDING NEW COLUMN GROUP AT PIVOT INDEX', i)
+          insertColumnGroup(new_column_group, column_tree[0], tree_index);
         }
-        column_latest[j] = current_pivot_value;
 
-        tree_index = column_idx.slice(0, j + 1);
-        new_column_group = {
-          title: current_pivot_value,
-          columns: []
+        // If final pivot, push measures into the final column group
+        if (j + 1 == pivot_fields.length) {
+          tree_index = column_idx.concat([0])
+          
         }
-        // console.log('ADDING NEW COLUMN GROUP AT PIVOT INDEX', i)
-        insertColumnGroup(new_column_group, column_tree[0], tree_index);
       }
 
-      // If final pivot, push measures into the final column group
-      if (j + 1 == pivot_fields.length) {
-        tree_index = column_idx.concat([0])
-        
-      }
-    }
+      // Once we have the indices for the current column group, push in all the measures
+      measures_array = []
+      for (m = 0; m < measures.length; m++) {
+        safe_name = pivot_index[i].key + '|' + measures[m].name.replace(".", "|");
 
-    // Once we have the indices for the current column group, push in all the measures
-    measures_array = []
-    for (m = 0; m < measures.length; m++) {
-      safe_name = pivot_index[i].key + '|' + measures[m].name.replace(".", "|");
-      mea_definition = {
-        title: measures[m].label_short,
-        field: safe_name,
-        align: measures[m].align,
+        if (measures[m].hasOwnProperty("label_short")) {
+          measure_title = measures[m].label_short
+        } else {
+          measure_title = measures[m].label
+        }
+
+        mea_definition = {
+          title: measure_title,
+          field: safe_name,
+          align: measures[m].align,
+        }
+        measures_array.push(mea_definition)
       }
-      measures_array.push(mea_definition)
+      insertMeasuresArray(measures_array, column_tree[0], tree_index) 
     }
-    insertMeasuresArray(measures_array, column_tree[0], tree_index) 
   }  
 
-  return column_tree[0]
+  return column_tree[0].columns
 }
 
 buildMeasureNamesArray = function(measures) {
@@ -1071,24 +1097,29 @@ updateDataTableWithMeasureValues = function(data, tbl_data, pivot_fields, mea_na
   if (pivot_fields.length > 0) {
     for (i = 0; i < data.length; i++) {
       for (j = 0; j < pivot_index.length; j++) {
-        for (var k = 0; k < mea_names.length; k++) {
-          var pivot_name = pivot_index[j].key
-          var raw_name = mea_names[k]
-          var safe_name = pivot_name + '|' + mea_names[k].replace(".", "|")
-          // console.log("Measure pivot_name", pivot_name)
-          // console.log("Measure raw_name", raw_name)
-          // console.log("Measure safe_name", safe_name)
-          // console.log("Value Index", i, raw_name, pivot_name)
-          // console.log("Data row", data[i])
+        if (pivot_index[j].key != "$$$_row_total_$$$") {
+          for (var k = 0; k < mea_names.length; k++) {
+            var pivot_name = pivot_index[j].key
+            var raw_name = mea_names[k]
+            var safe_name = pivot_name + '|' + mea_names[k].replace(".", "|")
 
-          if (typeof data[i][raw_name][pivot_name] !== 'undefined') {
-            var data_value = data[i][raw_name][pivot_name].value
-            // console.log("Data value", data_value)
-            tbl_data[i][safe_name] = data_value;  
-          } else {
-            // console.log("Data value undefined")
-          }  
-        }          
+            if (debug) {
+              // console.log("Measure pivot_name", pivot_name)
+              // console.log("Measure raw_name", raw_name)
+              // console.log("Measure safe_name", safe_name)
+              // console.log("Value Index", i, raw_name, pivot_name)
+              // console.log("Data row", data[i])
+            }
+
+            if (typeof data[i][raw_name][pivot_name] !== 'undefined') {
+              var data_value = data[i][raw_name][pivot_name].value
+              // if (debug) { console.log("Data value", data_value); }
+              tbl_data[i][safe_name] = data_value;  
+            } else {
+              // if (debug) { console.log("Data value undefined"); } 
+            }  
+          } 
+        }         
       }
     }
   } else {
