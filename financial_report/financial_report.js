@@ -852,6 +852,69 @@ insertMeasuresArray = function(measures_array, branch, index, iteration=1) {
   }
 }
 
+buildMeasuresTree = function(pivot_fields, pivot_index, measures) {
+  for (i = 0; i < pivot_fields.length; i++) {
+    // console.log(i, pivot_fields[i].name)
+  }
+
+  // Initialise tree
+  // column_idx: array indices so that columns and groups can be added at right place
+  // column_latest: most recent value seen for a pivot field
+  column_tree = [
+    {
+      title: "PIVOTED MEASURES",
+      columns: []
+    }
+  ];
+  column_idx = [];
+  column_latest = [];
+  for (j = 0; j < pivot_fields.length; j++) {
+    column_idx[j] = -1;
+    column_latest[j] = null;
+  }    
+
+  for (i = 0; i < pivot_index.length; i++) {
+    for (j = 0; j < pivot_fields.length; j++) {
+      current_pivot_value = pivot_index[i].data[pivot_fields[j].name];
+      if (current_pivot_value != column_latest[j]) {
+        column_idx[j]++;
+        for (k = j + 1; k < pivot_fields.length; k++) {
+          column_idx[k] = -1;
+        }
+        column_latest[j] = current_pivot_value;
+
+        tree_index = column_idx.slice(0, j + 1);
+        new_column_group = {
+          title: current_pivot_value,
+          columns: []
+        }
+        // console.log('ADDING NEW COLUMN GROUP AT PIVOT INDEX', i)
+        insertColumnGroup(new_column_group, column_tree[0], tree_index);
+      }
+
+      // If final pivot, push measures into the final column group
+      if (j + 1 == pivot_fields.length) {
+        tree_index = column_idx.concat([0])
+        
+      }
+    }
+
+    // Once we have the indices for the current column group, push in all the measures
+    measures_array = []
+    for (m = 0; m < measures.length; m++) {
+      safe_name = pivot_index[i].key + '|' + measures[m].name.replace(".", "|");
+      mea_definition = {
+        title: measures[m].label_short,
+        field: safe_name,
+        align: measures[m].align,
+      }
+      measures_array.push(mea_definition)
+    }
+    insertMeasuresArray(measures_array, column_tree[0], tree_index) 
+  }  
+
+  return column_tree[0]
+}
 
 looker.plugins.visualizations.add({
 
@@ -874,77 +937,9 @@ looker.plugins.visualizations.add({
     console.log("pivot fields", config.query_fields.pivots);
     console.log("pivot index", queryResponse.pivots);
 
-    pivot_fields = config.query_fields.pivots;
-    pivot_index = queryResponse.pivots;
-    measures = queryResponse.fields.measure_like;
-
-    if (pivot_fields.length > 0) {
-      for (i = 0; i < pivot_fields.length; i++) {
-        // console.log(i, pivot_fields[i].name)
-      }
-
-      // Initialise tree
-      // column_idx: array indices so that columns and groups can be added at right place
-      // column_latest: most recent value seen for a pivot field
-      column_tree = [
-        {
-          title: "PIVOTED MEASURES",
-          columns: []
-        }
-      ];
-      column_idx = [];
-      column_latest = [];
-      for (j = 0; j < pivot_fields.length; j++) {
-        column_idx[j] = -1;
-        column_latest[j] = null;
-      }    
-
-      for (i = 0; i < pivot_index.length; i++) {
-        for (j = 0; j < pivot_fields.length; j++) {
-          current_pivot_value = pivot_index[i].data[pivot_fields[j].name];
-          if (current_pivot_value != column_latest[j]) {
-            column_idx[j]++;
-            for (k = j + 1; k < pivot_fields.length; k++) {
-              column_idx[k] = -1;
-            }
-            column_latest[j] = current_pivot_value;
-
-            tree_index = column_idx.slice(0, j + 1);
-            new_column_group = {
-              title: current_pivot_value,
-              columns: []
-            }
-            // console.log('ADDING NEW COLUMN GROUP AT PIVOT INDEX', i)
-            insertColumnGroup(new_column_group, column_tree[0], tree_index);
-          }
-
-          // If final pivot, push measures into the final column group
-          if (j + 1 == pivot_fields.length) {
-            tree_index = column_idx.concat([0])
-            
-          }
-        }
-
-        // Once we have the indices for the current column group, push in all the measures
-        measures_array = []
-        for (m = 0; m < measures.length; m++) {
-          safe_name = pivot_index[i].key + '|' + measures[m].name.replace(".", "|");
-          mea_definition = {
-            title: measures[m].label_short,
-            field: safe_name,
-            align: measures[m].align,
-          }
-          measures_array.push(mea_definition)
-        }
-        insertMeasuresArray(measures_array, column_tree[0], tree_index) 
-      }
-      // console.log("COLUMN_TREE AT END OF PIVOT INDEX:", i, column_tree);      
-    }
-
-
-
     var vis = this;
 
+    // UPDATE OPTIONS PANEL
     new_options = global_options
     group_by_options = []
     queryResponse.fields.dimension_like.forEach(function(field) {
@@ -1039,18 +1034,23 @@ looker.plugins.visualizations.add({
     }
 
     // HANDLE MEASURES
-    // 1. Build definitions - this is taken from the measure_like array
-    // 2. If table is not pivoted, can just append measures
-    // 3. If table is pivoted, need to construct new references
+    pivot_fields = config.query_fields.pivots;
+    pivot_index = queryResponse.pivots;
+    measures = queryResponse.fields.measure_like;
+
+    if (pivot_fields.length > 0) {
+      measures_tree = buildMeasuresTree(pivot_fields, pivot_index, measures)
+    }
+
     var mea_names = []
     var mea_details = []
 
-    for (var i = 0; i < queryResponse.fields.measure_like.length; i++) {
-      var mea_name = queryResponse.fields.measure_like[i].name
+    for (var i = 0; i < measures.length; i++) {
+      var mea_name = measures[i].name
       mea_names.push(mea_name)
       
       var safe_name = mea_name.replace(".", "|")
-      var mea_object = queryResponse.fields.measure_like[i]
+      var mea_object = measures[i]
 
       mea_definition = {
         title: mea_object.label_short,
@@ -1125,7 +1125,7 @@ looker.plugins.visualizations.add({
           }          
         }
       }
-      table_col_details = dim_details.concat(column_tree[0].columns)
+      table_col_details = dim_details.concat(measures_tree.columns)
     } else {
       for (j = 0; j < data.length; j++) {
         for (var i = 0; i < mea_names.length; i++) {
