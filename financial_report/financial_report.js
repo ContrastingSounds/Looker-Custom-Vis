@@ -812,6 +812,43 @@ const getNestedObject = (nestedObj, pathArr) => {
         (obj && obj[key] !== 'undefined') ? obj[key] : undefined, nestedObj);
 }
 
+updateOptionsPanel = function(vis, dimensions, measures) {
+  new_options = global_options
+  group_by_options = []
+  dimensions.forEach(function(field) {
+    safe_name = field.name.replace(".", "|");
+    id = "Width: " + safe_name;
+    new_options[id] = {
+      default: null,
+      type: "number",
+    };
+    group_option = {};
+    group_option[field.label_short] = safe_name;
+    group_by_options.push(group_option);
+  });
+
+  new_options["group_by"] = {
+    section: "Data",
+    type: "string",
+    label: "Group By",
+    values: group_by_options,
+    display: "select",
+    default: null,
+  };
+
+  measures.forEach(function(field) {
+    safe_name = field.name.replace(".", "|");
+    id = "Width: " + safe_name;
+    new_options[id] = {
+      default: null,
+      type: "number",
+    };
+
+  });
+
+  vis.trigger('registerOptions', new_options); // register options with parent page to update visConfig  
+}
+
 insertColumnGroup = function(group, branch, index, iteration=1) {
   // console.log("insertColumnGroup, depth:", iteration);
   // console.log("--group:", group);
@@ -916,6 +953,8 @@ buildMeasuresTree = function(pivot_fields, pivot_index, measures) {
   return column_tree[0]
 }
 
+
+
 looker.plugins.visualizations.add({
 
   options: global_options,
@@ -940,40 +979,11 @@ looker.plugins.visualizations.add({
     var vis = this;
 
     // UPDATE OPTIONS PANEL
-    new_options = global_options
-    group_by_options = []
-    queryResponse.fields.dimension_like.forEach(function(field) {
-      safe_name = field.name.replace(".", "|");
-      id = "Width: " + safe_name;
-      new_options[id] = {
-        default: null,
-        type: "number",
-      };
-      group_option = {};
-      group_option[field.label_short] = safe_name;
-      group_by_options.push(group_option);
-    });
-
-    new_options["group_by"] = {
-      section: "Data",
-      type: "string",
-      label: "Group By",
-      values: group_by_options,
-      display: "select",
-      default: null,
-    };
-
-    queryResponse.fields.measure_like.forEach(function(field) {
-      safe_name = field.name.replace(".", "|");
-      id = "Width: " + safe_name;
-      new_options[id] = {
-        default: null,
-        type: "number",
-      };
-
-    });
-
-    this.trigger('registerOptions', new_options); // register options with parent page to update visConfig
+    updateOptionsPanel(
+      vis, 
+      queryResponse.fields.dimension_like, 
+      queryResponse.fields.measure_like
+    );
 
     // Clear any errors from previous updates.
     this.clearErrors();
