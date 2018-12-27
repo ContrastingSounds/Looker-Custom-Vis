@@ -1,31 +1,34 @@
+render_table = true;
 debug = false;
 
-format_usd = {
-      decimal: ".",
-      thousand: ",",
-      symbol: "$",
-      precision: 2,
-};
-format_gbp = {
-      decimal: ".",
-      thousand: ",",
-      symbol: "£",
-      precision: 2,
-};
-format_dec_0 = {
-      decimal: ".",
-      thousand: ",",
-      precision: 0,
-};
-format_dec_2 = {
-      decimal: ".",
-      thousand: ",",
-      precision: 2,
-};
-format_percent_2 = function(cell, formatterParams, onRendered){
-  rendered_value = (100 * cell.getValue()).toFixed(2).toString() + '%';
-  return rendered_value; 
-};
+formats = {
+  "usd": {
+        decimal: ".",
+        thousand: ",",
+        symbol: "$",
+        precision: 2,
+  },
+  "gbp": {
+        decimal: ".",
+        thousand: ",",
+        symbol: "£",
+        precision: 2,
+  },
+  "dec_0": {
+        decimal: ".",
+        thousand: ",",
+        precision: 0,
+  },
+  "dec_2": {
+        decimal: ".",
+        thousand: ",",
+        precision: 2,
+  },
+  "percent_2": function(cell, formatterParams, onRendered){
+    rendered_value = (100 * cell.getValue()).toFixed(2).toString() + '%';
+    return rendered_value; 
+  },
+}
 
 themeFinanceTable = `
   /* Based on: Tabulator v4.1.3 (c) Oliver Folkerd */
@@ -947,7 +950,53 @@ insertMeasuresArray = function(measures_array, branch, index, iteration=1) {
   }
 }
 
-buildMeasuresTree = function(pivot_fields, pivot_index, measures) {
+applyMeasureFormat = function(mea_object, mea_definition, config) {
+  if (["sum", "count", "count_distinct"].includes(mea_object.type)) {
+    mea_definition["bottomCalc"] = "sum";
+  }
+  else if (["average", "average_distinct"].includes(mea_object.type)) {
+    mea_definition["bottomCalc"] = "avg";
+  }
+
+  if (mea_object.value_format != null) {        
+    if (mea_object.value_format.indexOf("$") !== -1) {
+      mea_definition["formatter"] = "money"
+      mea_definition["bottomCalcFormatter"] = "money"
+      mea_definition["formatterParams"] = formats["usd"]
+      mea_definition["bottomCalcFormatterParams"] = formats["usd"]
+    }
+    else if (mea_object.value_format.indexOf("£") !== -1) {
+      mea_definition["formatter"] = "money"
+      mea_definition["bottomCalcFormatter"] = "money"
+      mea_definition["formatterParams"] = formats["gbp"]
+      mea_definition["bottomCalcFormatterParams"] = formats["gbp"]
+    }
+    else if (mea_object.value_format.indexOf("%") !== -1) {
+      mea_definition["formatter"] = format_percent_2;        
+    }
+    else if (mea_object.value_format.indexOf(".") !== -1) {
+      mea_definition["formatter"] = "money"
+      mea_definition["bottomCalcFormatter"] = "money"
+      mea_definition["formatterParams"] = formats["dec_2"]
+      mea_definition["bottomCalcFormatterParams"] = formats["dec_2"]
+    }
+    else {
+      mea_definition["formatter"] = "money"
+      mea_definition["bottomCalcFormatter"] = "money"
+      mea_definition["formatterParams"] = formats["dec_0"]
+      mea_definition["bottomCalcFormatterParams"] = formats["dec_0"]
+    }
+  }
+
+  console.log("config", config)
+  if (config["Width: " + safe_name] != null) {
+    mea_definition["width"] = config["Width: " + safe_name]
+  }
+
+  return mea_definition
+}
+
+buildMeasuresTree = function(pivot_fields, pivot_index, measures, config) {
   for (i = 0; i < pivot_fields.length; i++) {
     if (debug) {  console.log(i, pivot_fields[i].name); }
   }
@@ -999,22 +1048,24 @@ buildMeasuresTree = function(pivot_fields, pivot_index, measures) {
       // Once we have the indices for the current column group, push in all the measures
       measures_array = []
       for (m = 0; m < measures.length; m++) {
-        safe_name = pivot_index[i].key + '|' + measures[m].name.replace(".", "|");
+        mea_object = measures[m];
+        safe_name = pivot_index[i].key + '|' + mea_object.name.replace(".", "|");
 
         if (measures[m].hasOwnProperty("label_short")) {
-          measure_title = measures[m].label_short
+          measure_title = mea_object.label_short
         } else {
-          measure_title = measures[m].label
+          measure_title = mea_object.label
         }
 
         mea_definition = {
           title: measure_title,
           field: safe_name,
-          align: measures[m].align,
+          align: mea_object.align,
         }
-        measures_array.push(mea_definition)
+        mea_definition = applyMeasureFormat(mea_object, mea_definition, config);
+        measures_array.push(mea_definition);
       }
-      insertMeasuresArray(measures_array, column_tree[0], tree_index) 
+      insertMeasuresArray(measures_array, column_tree[0], tree_index) ;
     }
   }  
 
@@ -1046,47 +1097,7 @@ buildMeasuresFlat = function(measures, config) {
       align: mea_object.align,
     }
 
-    if (["sum", "count", "count_distinct"].includes(mea_object.type)) {
-      mea_definition["bottomCalc"] = "sum";
-    }
-    else if (["average", "average_distinct"].includes(mea_object.type)) {
-      mea_definition["bottomCalc"] = "avg";
-    }
-
-    if (mea_object.value_format != null) {        
-      if (mea_object.value_format.indexOf("$") !== -1) {
-        mea_definition["formatter"] = "money"
-        mea_definition["bottomCalcFormatter"] = "money"
-        mea_definition["formatterParams"] = format_usd
-        mea_definition["bottomCalcFormatterParams"] = format_usd
-      }
-      else if (mea_object.value_format.indexOf("£") !== -1) {
-        mea_definition["formatter"] = "money"
-        mea_definition["bottomCalcFormatter"] = "money"
-        mea_definition["formatterParams"] = format_gbp
-        mea_definition["bottomCalcFormatterParams"] = format_gbp
-      }
-      else if (mea_object.value_format.indexOf("%") !== -1) {
-        mea_definition["formatter"] = format_percent_2;        
-      }
-      else if (mea_object.value_format.indexOf(".") !== -1) {
-        mea_definition["formatter"] = "money"
-        mea_definition["bottomCalcFormatter"] = "money"
-        mea_definition["formatterParams"] = format_dec_2
-        mea_definition["bottomCalcFormatterParams"] = format_dec_2
-      }
-      else {
-        mea_definition["formatter"] = "money"
-        mea_definition["bottomCalcFormatter"] = "money"
-        mea_definition["formatterParams"] = format_dec_0
-        mea_definition["bottomCalcFormatterParams"] = format_dec_0
-      }
-    }
-
-    if (config["Width: " + safe_name] != null) {
-      mea_definition["width"] = config["Width: " + safe_name]
-    }
-
+    mea_definition = applyMeasureFormat(mea_object, mea_definition, config);
     mea_details.push(mea_definition)
   }
 
@@ -1145,7 +1156,8 @@ looker.plugins.visualizations.add({
     document.head.appendChild(this.style)
 
     var container = element.appendChild(document.createElement("div"));
-    container.id = "finance-tabulator";
+    container.id = "finance_tabulator";
+    this._textElement = container.appendChild(document.createElement("div"));
   },
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
@@ -1153,8 +1165,8 @@ looker.plugins.visualizations.add({
     this.clearErrors();
 
     // destory old viz if already exists
-    if ($("#finance-tabulator").hasClass("tabulator")) { 
-      $("#finance-tabulator").tabulator("destroy") 
+    if ($("#finance_tabulator").hasClass("tabulator")) { 
+      $("#finance_tabulator").tabulator("destroy") 
     }
 
     // Set style (this could be made flexible as per https://github.com/looker/custom_visualizations_v2/blob/master/src/examples/subtotal/subtotal.ts)
@@ -1162,10 +1174,11 @@ looker.plugins.visualizations.add({
 
     // print data to console for debugging:
     // console.log("data", data);
+    console.log("element", element);
     // console.log("config", config);
-    console.log("queryResponse", queryResponse);
-    console.log("pivot fields", config.query_fields.pivots);
-    console.log("pivot index", queryResponse.pivots);
+    // console.log("queryResponse", queryResponse);
+    // console.log("pivot fields", config.query_fields.pivots);
+    // console.log("pivot index", queryResponse.pivots);
 
     var vis = this;
     var dimensions = queryResponse.fields.dimension_like
@@ -1196,7 +1209,7 @@ looker.plugins.visualizations.add({
 
     // Update columns array with measures information
     if (pivot_fields.length > 0) {
-      mea_details = buildMeasuresTree(pivot_fields, pivot_index, measures)
+      mea_details = buildMeasuresTree(pivot_fields, pivot_index, measures, config)
     } else {
       mea_details = buildMeasuresFlat(measures, config);
     }
@@ -1214,44 +1227,50 @@ looker.plugins.visualizations.add({
 
     initial_sort = table_col_details[0].field;
 
-    var tbl = $("#finance-tabulator").tabulator({
-      data: tbl_data,           //load row data from array
-      layout:"fitDataFill",      // fit columns to data, but also fill full table width
-      // responsiveLayout: "hide",  //hide columns that dont fit on the table
-      
-      tooltips: true,            //show tool tips on cells
-      
-      pagination: false, //"local",       //paginate the data
-      paginationSize: 10,         //allow 7 rows per page of data
-      
-      movableColumns: false,      //allow column order to be changed
-      resizableColumns: true,
-      resizableRows: false,       //allow row size to be changed
-      
-      groupBy: group_by,
-      groupHeader: function(value, count, data, group) {
-          //value - the value all members of this group share
-          //count - the number of rows in this group
-          //data - an array of all the row data objects in this group
-          //group - the group component for the group
+    if (render_table) {
+      var tbl = $("#finance_tabulator").tabulator({
+        virtualDom: false,
+        data: tbl_data,           //load row data from array
+        layout:"fitDataFill",      // fit columns to data, but also fill full table width
+        // responsiveLayout: "hide",  //hide columns that dont fit on the table
+        
+        tooltips: true,            //show tool tips on cells
+        
+        pagination: false, //"local",       //paginate the data
+        paginationSize: 10,         //allow 7 rows per page of data
+        
+        movableColumns: false,      //allow column order to be changed
+        resizableColumns: true,
+        resizableRows: false,       //allow row size to be changed
+        
+        groupBy: group_by,
+        groupHeader: function(value, count, data, group) {
+            //value - the value all members of this group share
+            //count - the number of rows in this group
+            //data - an array of all the row data objects in this group
+            //group - the group component for the group
 
-          return value + "<span style='color:#d00; margin-left:10px;'>(" + count + " item)</span>";
-      },
+            return value + "<span style='color:#d00; margin-left:10px;'>(" + count + " item)</span>";
+        },
 
-      initialSort: [ {column: initial_sort, dir:"asc"} ],
-      columns: table_col_details,
+        initialSort: [ {column: initial_sort, dir:"asc"} ],
+        columns: table_col_details,
 
-      columnResized: function(column) {
-        col_resize = {};
-        col_resize["Width: " + column.column.definition.field] = column.column.width;
-        vis.trigger('updateConfig', [col_resize]);
-      },
+        columnResized: function(column) {
+          col_resize = {};
+          col_resize["Width: " + column.column.definition.field] = column.column.width;
+          vis.trigger('updateConfig', [col_resize]);
+        },
 
-      tooltips: function(cell) {
-          //function should return a string for the tooltip or false to hide the tooltip
-          return  cell.getColumn().getDefinition().title + ": " + cell.getValue(); 
-      },
-    });
+        tooltips: function(cell) {
+            //function should return a string for the tooltip or false to hide the tooltip
+            return  cell.getColumn().getDefinition().title + ": " + cell.getValue(); 
+        },
+      });      
+    } else {
+      this._textElement.innerHTML = "Columns: " + table_col_details.length
+    }
+
 
     // Always call done to indicate a visualization has finished rendering.
     done()
