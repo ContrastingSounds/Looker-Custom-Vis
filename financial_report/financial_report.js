@@ -1,7 +1,19 @@
+/**
+ *   Financial Report visualisation
+ *   Table vis using tabulator.js, primarily intended for finance-style reporting
+ */
+
+/**
+ *   render_table and debug are dev-only flags
+ */ 
 render_table = true;
 debug = false;
 
-formats = {
+/**
+ * Different Tablulator number formats to set the appearance of measure cells in the table
+ * Used by the applyMeasureFormat() function.
+ */
+number_formats = {
   "usd": {
         decimal: ".",
         thousand: ",",
@@ -24,12 +36,51 @@ formats = {
         thousand: ",",
         precision: 2,
   },
-  "percent_2": function(cell, formatterParams, onRendered){
+}
+
+/**
+ * Different Tablulator formatters to set the appearance of measure cells in the table
+ * Used by the applyMeasureFormat() function.
+ */
+formatters = {
+  "percent_2": function(cell, formatterParams, onRendered) {
     rendered_value = (100 * cell.getValue()).toFixed(2).toString() + '%';
     return rendered_value; 
   },
+  "spark_line": function(cell, formatterParams, onRendered) {
+    onRendered(function() {
+      $(cell.getElement()).sparkline(cell.getValue(), {width:"100%", type:"line"});
+    })
+  },
+  "spark_bar": function(cell, formatterParams, onRendered) {
+    onRendered(function() {
+      $(cell.getElement()).sparkline(cell.getValue(), {width:"100%", type:"bar"});
+    })
+  },
 }
 
+/**
+ * CSS theme for the table
+ * Based on Tabulator's simple theme
+ * Changes made:
+ *
+ * .tabulator {
+ *   font-family: Open Sans,Helvetica,Arial,sans-serif;
+ *   font-size: 11px;
+ * }
+ *
+ * .tabulator .tabulator-header { 
+ *   border-bottom: 1px solid #000;
+ * }
+ *
+ * .tabulator .tabulator-tableHolder .tabulator-table .tabulator-row.tabulator-calcs {
+ *   background: #ffffff !important;
+ * }
+ *
+ * .tabulator-row.tabulator-group {
+ *   background: #ffffff;
+ * }
+ */
 themeFinanceTable = `
   /* Based on: Tabulator v4.1.3 (c) Oliver Folkerd */
   .tabulator {
@@ -800,7 +851,10 @@ themeFinanceTable = `
   }
 `
 
-// Global options
+/** 
+ * Global options
+ * Required config settings for user settings
+ */
 global_options = {
   use_grouping: {
     section: "Data",
@@ -808,15 +862,27 @@ global_options = {
     label: "Use Grouping",
     default: "true"
   },
+  use_sparklines: {
+    section: "Data",
+    type: "boolean",
+    label: "Use Sparklines",
+    default: "true"
+  },
 }
 
-// function to get arbitrary nest array
-// https://hackernoon.com/accessing-nested-objects-in-javascript-f02f1bd6387f
+/** 
+ * function to retrieve object from nest of arbitrary depth, using array of indices
+ * https://hackernoon.com/accessing-nested-objects-in-javascript-f02f1bd6387f
+ */
 const getNestedObject = (nestedObj, pathArr) => {
     return pathArr.reduce((obj, key) =>
         (obj && obj[key] !== 'undefined') ? obj[key] : undefined, nestedObj);
 }
 
+/**
+ * Register new config options (eg settings for individual fields)
+ * Calls the registerOptions trigger provided by Looker Custom Vis API
+ */
 updateOptionsPanel = function(vis, dimensions, measures) {
   new_options = global_options
   group_by_options = []
@@ -854,6 +920,9 @@ updateOptionsPanel = function(vis, dimensions, measures) {
   vis.trigger('registerOptions', new_options); // register options with parent page to update visConfig  
 }
 
+/**
+ * Short function to get an array of all dimension names
+ */
 buildDimensionNamesArray = function(dimensions) {
   dim_names = []
   for (var i = 0; i < dimensions.length; i++) {
@@ -862,6 +931,12 @@ buildDimensionNamesArray = function(dimensions) {
   return dim_names
 }
 
+/**
+ * Builds array of Tabulator column definitions for all the dimensions
+ * Maybe due to not being familiar with Javascript, but had some odd behaviour when trying to
+ * refer to fields using dotted notation, so using "safe names" where all periods replaced with pipes
+ * Note: dimensions use the label_short property for their names, table calcs use the label property
+ */
 buildDimensionDefinitions = function(dimensions, config) {
   dim_details = []
   for (var i = 0; i < dimensions.length; i++) {
@@ -885,6 +960,10 @@ buildDimensionDefinitions = function(dimensions, config) {
   return dim_details  
 }
 
+/**
+ * Builds the data set as an array of rows, populated with the dimension fields
+ * This will later be enriched with measures and supermeasures.
+ */
 buildTableSpine = function(data, dim_names) {
   var tbl_data = []
   for (j = 0; j < data.length; j++) {
@@ -901,6 +980,13 @@ buildTableSpine = function(data, dim_names) {
   return tbl_data  
 }
 
+/**
+ * Recursive function to add a Tabulator column group to the Measures Tree for pivoted tables
+ * Given an index as an array, it will make its way down through the tree branches until it
+ * reaches the level passed as a parameter.
+ *
+ * Don't think there's another way – this allows trees of arbitrary depth
+ */
 insertColumnGroup = function(group, branch, index, iteration=1) {
   if (debug) {
     console.log("insertColumnGroup, depth:", iteration);
@@ -911,21 +997,19 @@ insertColumnGroup = function(group, branch, index, iteration=1) {
 
   if (iteration == index.length) {
     insert_point = index[index.length - 1];
-    if (debug) { console.log('--insert_point:', insert_point) };
-
     branch.columns.push(group);
-    if (debug) { console.log("column_tree:", column_tree) };
+
   } else {
     branch_index = index[iteration - 1];
-    if (debug) { console.log('--Going further. branch_index:', branch_index); }
-
     sub_branch = branch.columns[branch_index];
-    if (debug) { console.log('--sub_branch', sub_branch); }
-
     insertColumnGroup(group, sub_branch, index, iteration + 1);
   }
 }
 
+/**
+ * Adds an array of measures as leaves on the Measures Tree (using Tabulator column definitions)
+ * Recursive in order to support trees/pivots of arbitrary depth
+ */
 insertMeasuresArray = function(measures_array, branch, index, iteration=1) {
   if (debug) {
     console.log("insertMeasuresArray, depth:", iteration);
@@ -936,20 +1020,20 @@ insertMeasuresArray = function(measures_array, branch, index, iteration=1) {
 
   if (iteration == index.length) {
     insert_point = index[index.length - 1];
-    if (debug) { console.log('--insert_point:', insert_point); }
-
     branch.columns = measures_array;
-    if (debug) { console.log("column_tree:", column_tree); }
   } else {
     branch_index = index[iteration - 1];
-    if (debug) { console.log('--Going further. branch_index:', branch_index); }
-
     sub_branch = branch.columns[branch_index];
-    if (debug) { console.log('--sub_branch', sub_branch); }
     insertMeasuresArray(measures_array, sub_branch, index, iteration + 1);    
   }
 }
 
+/**
+ * Given a measure object and association definition, returns an updated measure definition
+ * with the appropriate formatter and calculation when grouped.
+ * Number formats stored in number_formats object.
+ * Formatter functions (including spark lines) stored in formatters object.
+ */
 applyMeasureFormat = function(mea_object, mea_definition, config) {
   if (["sum", "count", "count_distinct"].includes(mea_object.type)) {
     mea_definition["bottomCalc"] = "sum";
@@ -960,35 +1044,34 @@ applyMeasureFormat = function(mea_object, mea_definition, config) {
 
   if (mea_object.value_format != null) {        
     if (mea_object.value_format.indexOf("$") !== -1) {
-      mea_definition["formatter"] = "money"
+      mea_definition["formatter"] = "money" // formats["spark_line"] //"money"
       mea_definition["bottomCalcFormatter"] = "money"
-      mea_definition["formatterParams"] = formats["usd"]
-      mea_definition["bottomCalcFormatterParams"] = formats["usd"]
+      mea_definition["formatterParams"] = number_formats["usd"]
+      mea_definition["bottomCalcFormatterParams"] = number_formats["usd"]
     }
     else if (mea_object.value_format.indexOf("£") !== -1) {
       mea_definition["formatter"] = "money"
       mea_definition["bottomCalcFormatter"] = "money"
-      mea_definition["formatterParams"] = formats["gbp"]
-      mea_definition["bottomCalcFormatterParams"] = formats["gbp"]
+      mea_definition["formatterParams"] = number_formats["gbp"]
+      mea_definition["bottomCalcFormatterParams"] = number_formats["gbp"]
     }
     else if (mea_object.value_format.indexOf("%") !== -1) {
-      mea_definition["formatter"] = format_percent_2;        
+      mea_definition["formatter"] = formatters["percent_2"];        
     }
     else if (mea_object.value_format.indexOf(".") !== -1) {
       mea_definition["formatter"] = "money"
       mea_definition["bottomCalcFormatter"] = "money"
-      mea_definition["formatterParams"] = formats["dec_2"]
-      mea_definition["bottomCalcFormatterParams"] = formats["dec_2"]
+      mea_definition["formatterParams"] = number_formats["dec_2"]
+      mea_definition["bottomCalcFormatterParams"] = fornumber_formatsmats["dec_2"]
     }
     else {
       mea_definition["formatter"] = "money"
       mea_definition["bottomCalcFormatter"] = "money"
-      mea_definition["formatterParams"] = formats["dec_0"]
-      mea_definition["bottomCalcFormatterParams"] = formats["dec_0"]
+      mea_definition["formatterParams"] = number_formats["dec_0"]
+      mea_definition["bottomCalcFormatterParams"] = number_formats["dec_0"]
     }
   }
 
-  console.log("config", config)
   if (config["Width: " + safe_name] != null) {
     mea_definition["width"] = config["Width: " + safe_name]
   }
@@ -996,6 +1079,10 @@ applyMeasureFormat = function(mea_object, mea_definition, config) {
   return mea_definition
 }
 
+/**
+ * For pivoted tables, builds a Measures Tree of column groups and definitions.
+ * This nested array will be concatenated to the existing array of dimension columns
+ */
 buildMeasuresTree = function(pivot_fields, pivot_index, measures, config) {
   for (i = 0; i < pivot_fields.length; i++) {
     if (debug) {  console.log(i, pivot_fields[i].name); }
@@ -1025,7 +1112,7 @@ buildMeasuresTree = function(pivot_fields, pivot_index, measures, config) {
           column_idx[j]++;
           for (k = j + 1; k < pivot_fields.length; k++) {
             column_idx[k] = -1;
-            column_latest[k] = null; // !!!!!!!!!!!!!!!
+            column_latest[k] = null;
           }
           column_latest[j] = current_pivot_value;
 
@@ -1072,6 +1159,9 @@ buildMeasuresTree = function(pivot_fields, pivot_index, measures, config) {
   return column_tree[0].columns
 }
 
+/**
+ * Simple function to build array of measure names
+ */
 buildMeasureNamesArray = function(measures) {
   mea_names = []
   for (var i = 0; i < measures.length; i++) {
@@ -1080,6 +1170,10 @@ buildMeasureNamesArray = function(measures) {
   return mea_names
 }
 
+/**
+ * For 'flat' non-pivoted tables, builds simple array of measures (as Tabulator column definitions)
+ * This array will be concatenated to the existing array of dimension columns
+ */
 buildMeasuresFlat = function(measures, config) {
   var mea_names = []
   var mea_details = []
@@ -1104,33 +1198,93 @@ buildMeasuresFlat = function(measures, config) {
   return mea_details
 }
 
-updateDataTableWithMeasureValues = function(data, tbl_data, pivot_fields, mea_names) {
+/**
+ * Constructs a new column reference for pivoted tables with a sparkline
+ * This requires all but the last pivot field.
+ * TODO: this should probably be done with a .join() method, and probably just inline
+ */
+getSparklinePivotIndex = function(pivot_fields, pivot_index, pivot_index_num) {
+  var new_name = pivot_index[pivot_index_num].data[pivot_fields[0].name];
+  var pivot_depth = pivot_fields.length - 1;
+  for (i = 1; i < pivot_depth; i++) {
+    new_name += '|' + pivot_index[pivot_index_num].data[pivot_fields[i].name];
+  }
+  return new_name
+}
+
+/**
+ * Iterates through each data row and measure, adding each value to the data table using the
+ * appropriate field name. The correct value and field depends on whether pivots and spark
+ * lines are to be used.
+ *
+ * If pivoted with spark lines:
+ *  1. 
+ *
+ * If pivoted without spark lines:
+ *
+ * If a flat table:
+ *
+ *
+ */
+updateDataTableWithMeasureValues = function(data, tbl_data, pivot_fields, mea_names, config) {
   if (pivot_fields.length > 0) {
-    for (i = 0; i < data.length; i++) {
-      for (j = 0; j < pivot_index.length; j++) {
-        if (pivot_index[j].key != "$$$_row_total_$$$") {
-          for (var k = 0; k < mea_names.length; k++) {
-            var pivot_name = pivot_index[j].key
-            var raw_name = mea_names[k]
-            var safe_name = pivot_name + '|' + mea_names[k].replace(".", "|")
+    for (i = 0; i < data.length; i++) {                        // Per row in dataset
+      for (var j = 0; j < mea_names.length; j++) {             // Per measure
+        raw_name = mea_names[j]
+        safe_name = raw_name.replace(".", "|")
+        if (i==3) {console.log("raw_name", raw_name)}
 
-            if (debug) {
-              // console.log("Measure pivot_name", pivot_name)
-              // console.log("Measure raw_name", raw_name)
-              // console.log("Measure safe_name", safe_name)
-              // console.log("Value Index", i, raw_name, pivot_name)
-              // console.log("Data row", data[i])
-            }
+        if (config.use_sparklines) { // Only if using sparklines do we need to build an array
+          spark_name = null;
+          spark_values = [];
+        }
 
-            if (typeof data[i][raw_name][pivot_name] !== 'undefined') {
-              var data_value = data[i][raw_name][pivot_name].value
-              // if (debug) { console.log("Data value", data_value); }
-              tbl_data[i][safe_name] = data_value;  
+        for (k = 0; k < pivot_index.length; k++) {             // Per column
+          if (pivot_index[k].key != "$$$_row_total_$$$") {     // Ignore row_totals for now
+            if (config.use_sparklines) {
+              var new_spark_name = getSparklinePivotIndex(pivot_fields, pivot_index, k)
+              var pivot_name = pivot_index[k].key
+              if (i==3) {console.log("new_spark_name, spark_name", new_spark_name, spark_name)}
+
+              // If the spark_name has changed, "flush" the current values into a data entry
+              if (new_spark_name != spark_name) {
+                if (i==3) {console.log("spark_name has changed", new_spark_name, spark_name, spark_values)}
+                if (spark_name != null && spark_values) {
+                  var field_name = spark_name + '|' + safe_name
+                  tbl_data[i][field_name] = spark_values;
+                  if (i==3) {console.log("FLUSH VALUES: ", field_name, spark_values)}
+                }
+
+                if (typeof data[i][raw_name][pivot_name] !== 'undefined') {
+                  var data_value = data[i][raw_name][pivot_name].value
+                  spark_values = [data_value];
+                  if (i==3) { console.log("raw_name", raw_name, data_value)  }
+                }
+
+                spark_name = new_spark_name;
+
+              } else { // Otherwise, just push the current value into spark_values
+                if (typeof data[i][raw_name][pivot_name] !== 'undefined') {
+                  var data_value = data[i][raw_name][pivot_name].value
+                  spark_values.push(data_value);
+                }
+              }  
+
             } else {
-              // if (debug) { console.log("Data value undefined"); } 
-            }  
+              var pivot_name = pivot_index[k].key
+              var field_name = pivot_name + '|' + safe_name
+
+              if (debug) {
+                // console.log("Measure pivot_name", pivot_name)
+                // console.log("Measure raw_name", raw_name)
+                // console.log("Measure safe_name", safe_name)
+                // console.log("Value Index", i, raw_name, pivot_name)
+                // console.log("Data row", data[i])
+              }
+              if (data_value) { tbl_data[i][field_name] = data_value; } 
+            }
           } 
-        }         
+        }     
       }
     }
   } else {
@@ -1145,7 +1299,31 @@ updateDataTableWithMeasureValues = function(data, tbl_data, pivot_fields, mea_na
   }
 }
 
-
+/**
+ * Adds a new data vis to the Looker instance
+ * As per the Custom Vis API, includes:
+ *   options – user config settings for the vis
+ *   create - used to add the HTML elements required to host the vis
+ *   updateAsync - generates the actual vis
+ *
+ * Finance Table Vis:
+ *  1. Clear errors, the old vis, the data table
+ *  2. Set style
+ *  3. Validate config. May restrict the depth of pivots allowed based on behaviour seen so far.
+ *  4. Handle dimensions
+ *     - Add rows to data table
+ *     - Create array of column definitions
+ *  5. Handle measures
+ *     - Add rows to data table – updateDataTableWithMeasureValues()
+ *       - Three variations: pivoted, pivoted with spark lines, flat
+ *     - Create column definitions
+ *       - Pivot table: buildMeasuresTree()
+ *       - Flat table: buildMeasuresArray() 
+ *     - Append measure columns to dimenion columns
+ *  6. Set group_by, if set in user config
+ *  7. Set sort order (currently defaulting to first dimension column)
+ *  8. Render Tabulator table
+ */
 looker.plugins.visualizations.add({
 
   options: global_options,
@@ -1163,6 +1341,7 @@ looker.plugins.visualizations.add({
   updateAsync: function(data, element, config, queryResponse, details, done) {
     // Clear any errors from previous updates.
     this.clearErrors();
+    delete tbl_data;
 
     // destory old viz if already exists
     if ($("#finance_tabulator").hasClass("tabulator")) { 
@@ -1177,14 +1356,15 @@ looker.plugins.visualizations.add({
     console.log("element", element);
     // console.log("config", config);
     // console.log("queryResponse", queryResponse);
-    // console.log("pivot fields", config.query_fields.pivots);
-    // console.log("pivot index", queryResponse.pivots);
+    console.log("pivot fields", config.query_fields.pivots);
+    console.log("pivot index", queryResponse.pivots);
 
     var vis = this;
     var dimensions = queryResponse.fields.dimension_like
     var measures = queryResponse.fields.measure_like
 
     // Throw some errors and exit if the shape of the data isn't what this chart needs.
+    // TODO: figure out the necessary error conditions and update as necessary
     if (dimensions.length == 0) {
       this.addError({title: "No Dimensions", message: "This chart requires dimensions."});
       return;
@@ -1195,9 +1375,9 @@ looker.plugins.visualizations.add({
 
     // HANDLE DIMENSIONS
     var dim_names = buildDimensionNamesArray(dimensions);
-    var dim_details = buildDimensionDefinitions(dimensions, config);
     var tbl_data = buildTableSpine(data, dim_names);
-
+    var dim_details = buildDimensionDefinitions(dimensions, config);
+    
     // HANDLE MEASURES
     pivot_fields = config.query_fields.pivots;
     pivot_index = queryResponse.pivots;
@@ -1205,9 +1385,9 @@ looker.plugins.visualizations.add({
 
     var mea_names = buildMeasureNamesArray(measures);
 
-    updateDataTableWithMeasureValues(data, tbl_data, pivot_fields, mea_names);
+    updateDataTableWithMeasureValues(data, tbl_data, pivot_fields, mea_names, config);
 
-    // Update columns array with measures information
+    // Update column definitions with measures information
     if (pivot_fields.length > 0) {
       mea_details = buildMeasuresTree(pivot_fields, pivot_index, measures, config)
     } else {
