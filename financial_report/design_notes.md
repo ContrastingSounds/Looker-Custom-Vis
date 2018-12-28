@@ -133,9 +133,12 @@ The Tabulator table object itself, tied to the __finance_tabulator__ HTML elemen
 
 ### pivot_depth _(pivot_fields.length)_
 
+Integer defining how many of the pivot fields to use. For pivot tables without spark lines, all fields are used, and this is equal to ```pivot_fields.length```.
 
 ## Pivot Table with Spark Lines
 
 ### pivot_depth _(pivot_fields.length - 1)_
+
+Integer defining how many of the pivot fields to use. For pivot tables with spark lines, the final field is not used, and this is equal to ```pivot_fields.length - 1```.
 
 ### spark_index _(filtered version of pivot_index)_
