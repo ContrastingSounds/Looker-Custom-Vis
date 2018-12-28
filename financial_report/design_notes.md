@@ -1,14 +1,102 @@
 # Financial Table Design Notes
 
-- Functions
 - Simplified Data Structures
   - Globals, settings
   - From Looker
   - All Tables
   - Flat Tables
+- Functions
 - Pivot Tables
   - Pivots without Sparklines
   - Pivots with Sparklines
+
+
+# Simplified Data Structures
+
+## From Looker
+
+These variables are provided by Looker as part of the Custom Vis API. The API's updateAsync function includes ```data, element, config, queryResponse, details, done``` parameters. The data structures of particular interest are:
+
+### dimensions _(queryResponse.fields.dimension_like)_
+
+Array of all dimension-like objects, including dimensions, custom dimensions and table calcs.
+
+### measures _(queryResponse.fields.measure_like)_
+
+Array of all measure-like objects, including measures, custom measures and table calcs.
+
+### pivot_fields _(config.query_fields.pivots)_
+
+Array of pivot field objects, including their sort order index.
+
+### pivot_index _(queryResponse.pivots)_
+
+Array of all pivot index objects, that is the objects that describe every pivot column in the dataset. Includes their key, which combined with a measure name uniquely identifies a column in the dataset.
+
+
+## Globals, settings
+
+### number_formats
+
+Map of format names to parameter settings.
+
+### formatters
+
+Map of formatter names to functions.
+
+### themeFinancialTable
+
+CSS Stylesheet for the vis.
+
+### global_options
+
+Required user options for the vis.
+
+
+## All Tables
+
+These variables are used for all variations of the vis. They are effectively global (within the context of a custom vis plugin).
+
+### dim_names
+
+Simple array of all dimension names.
+
+### dim_details
+
+Array of column definitions, using the Tabulator column definition structure. Concatenated with mea_details and (not yet implemented) supermeasures to provide the Tabulator object with an array of all columns.
+
+### tbl_data
+
+Array of table data, using the Tabulator row definition structure. Field properties must match exactly to the fields defined in dim_details.
+
+### mea_names
+
+Simple array of all measure names.
+
+### mea_details
+
+Array of column definitions, using the Tabulator column definition structure. Concatenated with dim_details and (not yet implemented) supermeasures to provide the Tabulator object with an array of all columns.
+
+### table_col_details
+
+The complete array of column definitions, a concatenation of ```dim_details```, ```mea_details``` and (not yet implemented) supermeasures.
+
+### group_by
+
+Field used for grouping – based on user options
+
+### initial_sort
+
+Field used for sorting table on display – currently hard-coded to the first dimension.
+
+### tbl
+
+The Tabulator table object itself, tied to the ```finance_tabulator``` HTML element.
+
+## Flat Tables
+
+Flat tables are easy! No additional vis-level variables required.
+
 
 # Functions
 
@@ -58,93 +146,6 @@ _returns:_ dim_details
 
 ### updateDataTableWithMeasureValues
 
-
-# Simplified Data Structures
-
-## Globals, settings
-
-### number_formats
-
-Map of format names to parameter settings.
-
-### formatters
-
-Map of formatter names to functions.
-
-### themeFinancialTable
-
-CSS Stylesheet for the vis.
-
-### global_options
-
-Required user options for the vis.
-
-
-## From Looker
-
-These variables are provided by Looker as part of the Custom Vis API. The API's updateAsync function includes ```data, element, config, queryResponse, details, done``` parameters. The data structures of particular interest are:
-
-### dimensions _(queryResponse.fields.dimension_like)_
-
-Array of all dimension-like objects, including dimensions, custom dimensions and table calcs.
-
-### measures _(queryResponse.fields.measure_like)_
-
-Array of all measure-like objects, including measures, custom measures and table calcs.
-
-### pivot_fields _(config.query_fields.pivots)_
-
-Array of pivot field objects, including their sort order index.
-
-### pivot_index _(queryResponse.pivots)_
-
-Array of all pivot index objects, that is the objects that describe every pivot column in the dataset. Includes their key, which combined with a measure name uniquely identifies a column in the dataset.
-
-
-## All Tables
-
-These variables are used for all variations of the vis. They are effectively global (within the context of a custom vis plugin).
-
-### dim_names
-
-Simple array of all dimension names.
-
-### dim_details
-
-Array of column definitions, using the Tabulator column definition structure. Concatenated with mea_details and (not yet implemented) supermeasures to provide the Tabulator object with an array of all columns.
-
-### tbl_data
-
-Array of table data, using the Tabulator row definition structure. Field properties must match exactly to the fields defined in dim_details.
-
-### mea_names
-
-Simple array of all measure names.
-
-### mea_details
-
-Array of column definitions, using the Tabulator column definition structure. Concatenated with dim_details and (not yet implemented) supermeasures to provide the Tabulator object with an array of all columns.
-
-### table_col_details
-
-The complete array of column definitions, a concatenation of ```dim_details```, ```mea_details``` and (not yet implemented) supermeasures.
-
-### group_by
-
-Field used for grouping – based on user options
-
-### initial_sort
-
-Field used for sorting table on display – currently hard-coded to the first dimension.
-
-### tbl
-
-The Tabulator table object itself, tied to the ```finance_tabulator``` HTML element.
-
-
-## Flat Table
-
-Flat tables are easy! No additional vis-level variables required.
 
 # Pivot Tables
 
