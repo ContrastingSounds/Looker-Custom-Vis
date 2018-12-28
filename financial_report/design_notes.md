@@ -1,3 +1,15 @@
+# Financial Table Design Notes
+
+- Functions
+- Simplified Data Structures
+  - Globals, settings
+  - From Looker
+  - All Tables
+  - Flat Tables
+- Pivot Tables
+  - Pivots without Sparklines
+  - Pivots with Sparklines
+
 # Functions
 
 ### getNestedObject
@@ -130,7 +142,7 @@ The Tabulator table object itself, tied to the ```finance_tabulator``` HTML elem
 
 Flat tables are easy! No additional vis-level variables required.
 
-## Pivot Table
+# Pivot Tables
 
 Pivot tables require additional processing. The pivot fields must be converted in to Tabulator column groups. This means that the Tabulator's ```columns``` property is no longer a simple array of column definitions, but is now represented as the __Measures Tree__, a nested array of arbitrary depth. As the depth is not known in advance, a couple of recursive functions are used to dynamically create the tree.
 
@@ -140,6 +152,7 @@ Creating the __Measures Tree__ involves three functions:
 2. __insertColumnGroup__ - recursive function to add column groups (branches) to the tree
 3. __insertMeasuresArray__ – recursive function to add arrays of measures (leaves) to the tree
 
+## Pivot Tables without Spark Lines
 
 ### pivot_depth _(pivot_fields.length)_
 
