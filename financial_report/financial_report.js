@@ -874,9 +874,9 @@ global_options = {
  * function to retrieve object from nest of arbitrary depth, using array of indices
  * https://hackernoon.com/accessing-nested-objects-in-javascript-f02f1bd6387f
  */
-const getNestedObject = (nestedObj, pathArr) => {
+const getNestedObject = (nestedArray, pathArr) => {
     return pathArr.reduce((obj, key) =>
-        (obj && obj[key] !== 'undefined') ? obj[key] : undefined, nestedObj);
+        (obj && obj[key] !== 'undefined') ? obj[key] : undefined, nestedArray);
 }
 
 /**
@@ -1082,11 +1082,17 @@ applyMeasureFormat = function(mea_object, mea_definition, config) {
 /**
  * For pivoted tables, builds a Measures Tree of column groups and definitions.
  * This nested array will be concatenated to the existing array of dimension columns
+ *
+ * Initialise tree with empty column group (title: PIVOTED MEASURES)
+ * Initialise arrays tracking current location (array index) and value
+ * 
+ *  
  */
-buildMeasuresTree = function(pivot_fields, pivot_index, measures, config) {
+buildMeasuresTree = function(pivot_fields, column_keys, measures, config) {
   for (i = 0; i < pivot_fields.length; i++) {
     if (debug) {  console.log(i, pivot_fields[i].name); }
   }
+  console.log("column_keys", column_keys)
 
   // Initialise tree
   // column_idx: array indices so that columns and groups can be added at right place
@@ -1099,15 +1105,22 @@ buildMeasuresTree = function(pivot_fields, pivot_index, measures, config) {
   ];
   column_idx = [];
   column_latest = [];
-  for (j = 0; j < pivot_fields.length; j++) {
+
+  for (j = 0; j < pivot_depth; j++) {
     column_idx[j] = -1;
     column_latest[j] = null;
   }    
 
-  for (i = 0; i < pivot_index.length; i++) {
-    if (pivot_index[i].key != "$$$_row_total_$$$") {
+  for (i = 0; i < column_keys.length; i++) {
+    if (column_keys[i].key != "$$$_row_total_$$$") {
       for (j = 0; j < pivot_fields.length; j++) {
-        current_pivot_value = pivot_index[i].data[pivot_fields[j].name];
+        // TODO: This function is isolating individual fields in the pivot key
+        //   but for sparklines, we've built a new array of indices which doesn't have the .data
+        //   So we need to do something slightly different.
+        //   - can the spark_index be built out of raw_names?
+        //   - does the spark_index need to be built out of [raw_name, safe_name] tuples?
+        //   - is there a javascript equivalent to Python's tuples?
+        current_pivot_value = column_keys[i].data[pivot_fields[j].name];
         if (current_pivot_value != column_latest[j]) {
           column_idx[j]++;
           for (k = j + 1; k < pivot_fields.length; k++) {
@@ -1126,9 +1139,8 @@ buildMeasuresTree = function(pivot_fields, pivot_index, measures, config) {
         }
 
         // If final pivot, push measures into the final column group
-        if (j + 1 == pivot_fields.length) {
+        if (j + 1 == pivot_depth) {
           tree_index = column_idx.concat([0])
-          
         }
       }
 
@@ -1136,7 +1148,7 @@ buildMeasuresTree = function(pivot_fields, pivot_index, measures, config) {
       measures_array = []
       for (m = 0; m < measures.length; m++) {
         mea_object = measures[m];
-        safe_name = pivot_index[i].key + '|' + mea_object.name.replace(".", "|");
+        safe_name = column_keys[i].key + '|' + mea_object.name.replace(".", "|");
 
         if (measures[m].hasOwnProperty("label_short")) {
           measure_title = mea_object.label_short
@@ -1152,6 +1164,7 @@ buildMeasuresTree = function(pivot_fields, pivot_index, measures, config) {
         mea_definition = applyMeasureFormat(mea_object, mea_definition, config);
         measures_array.push(mea_definition);
       }
+      console.log("calling insertMeasuresArray with", measures_array, column_tree[0], tree_index)
       insertMeasuresArray(measures_array, column_tree[0], tree_index) ;
     }
   }  
@@ -1227,6 +1240,7 @@ getSparklinePivotIndex = function(pivot_fields, pivot_index, pivot_index_num) {
  *
  */
 updateDataTableWithMeasureValues = function(data, tbl_data, pivot_fields, mea_names, config) {
+  spark_index = [];
   if (pivot_fields.length > 0) {
     for (i = 0; i < data.length; i++) {                        // Per row in dataset
       for (var j = 0; j < mea_names.length; j++) {             // Per measure
@@ -1247,12 +1261,24 @@ updateDataTableWithMeasureValues = function(data, tbl_data, pivot_fields, mea_na
               if (i==3) {console.log("new_spark_name, spark_name", new_spark_name, spark_name)}
 
               // If the spark_name has changed, "flush" the current values into a data entry
+              // Also store the index, using same data structure as the pivot_index
               if (new_spark_name != spark_name) {
                 if (i==3) {console.log("spark_name has changed", new_spark_name, spark_name, spark_values)}
                 if (spark_name != null && spark_values) {
                   var field_name = spark_name + '|' + safe_name
+                  var index_data = {}
+                  for (p = 0; p < pivot_fields.length-1; p++) {
+                    index_data[pivot_fields[p].name] = pivot_index[k].data[pivot_fields[p].name]
+                  }
                   tbl_data[i][field_name] = spark_values;
-                  if (i==3) {console.log("FLUSH VALUES: ", field_name, spark_values)}
+
+                  index_entry = {
+                    data: index_data,
+                    key: field_name
+                  }
+                  spark_index.push(index_entry)
+                  if (i==3) {console.log("FLUSH VALUES: ", field_name, index_entry, spark_values)}
+
                 }
 
                 if (typeof data[i][raw_name][pivot_name] !== 'undefined') {
@@ -1287,6 +1313,7 @@ updateDataTableWithMeasureValues = function(data, tbl_data, pivot_fields, mea_na
         }     
       }
     }
+    return spark_index
   } else {
     for (j = 0; j < data.length; j++) {
       for (var i = 0; i < mea_names.length; i++) {
@@ -1296,6 +1323,7 @@ updateDataTableWithMeasureValues = function(data, tbl_data, pivot_fields, mea_na
           tbl_data[j][safe_name] = data[j][raw_name].value;
       }
     }
+    return []
   }
 }
 
@@ -1314,7 +1342,7 @@ updateDataTableWithMeasureValues = function(data, tbl_data, pivot_fields, mea_na
  *     - Add rows to data table
  *     - Create array of column definitions
  *  5. Handle measures
- *     - Add rows to data table – updateDataTableWithMeasureValues()
+ *     - Add rows to data table: updateDataTableWithMeasureValues()
  *       - Three variations: pivoted, pivoted with spark lines, flat
  *     - Create column definitions
  *       - Pivot table: buildMeasuresTree()
@@ -1353,11 +1381,9 @@ looker.plugins.visualizations.add({
 
     // print data to console for debugging:
     // console.log("data", data);
-    console.log("element", element);
+    // console.log("element", element);
     // console.log("config", config);
-    // console.log("queryResponse", queryResponse);
-    console.log("pivot fields", config.query_fields.pivots);
-    console.log("pivot index", queryResponse.pivots);
+    console.log("queryResponse", queryResponse);
 
     var vis = this;
     var dimensions = queryResponse.fields.dimension_like
@@ -1377,19 +1403,40 @@ looker.plugins.visualizations.add({
     var dim_names = buildDimensionNamesArray(dimensions);
     var tbl_data = buildTableSpine(data, dim_names);
     var dim_details = buildDimensionDefinitions(dimensions, config);
-    
-    // HANDLE MEASURES
+
+    console.log("Dimensions:", dim_names)
+
+    // HANDLE PIVOTS
     pivot_fields = config.query_fields.pivots;
     pivot_index = queryResponse.pivots;
+    if (config.use_sparklines) {
+      pivot_depth = pivot_fields.length -1
+    } else {
+      pivot_depth = pivot_fields.length
+    }
+
+    console.log("Pivot Fields from config", pivot_fields);
+    console.log("Pivot Index from queryResponse", pivot_index);
+    console.log("Pivot Depth", pivot_depth, pivot_fields.slice(0, pivot_depth))
+
+    // HANDLE MEASURES
+
+    spark_index = []
     measures = queryResponse.fields.measure_like;
 
     var mea_names = buildMeasureNamesArray(measures);
+    console.log("Measures:", mea_names)
 
-    updateDataTableWithMeasureValues(data, tbl_data, pivot_fields, mea_names, config);
+    spark_index = updateDataTableWithMeasureValues(data, tbl_data, pivot_fields, mea_names, config);
 
     // Update column definitions with measures information
     if (pivot_fields.length > 0) {
-      mea_details = buildMeasuresTree(pivot_fields, pivot_index, measures, config)
+      if (config.use_sparklines) {
+        keys = spark_index
+      } else {
+        keys = pivot_index
+      }
+      mea_details = buildMeasuresTree(pivot_fields, keys, measures, config)
     } else {
       mea_details = buildMeasuresFlat(measures, config);
     }
