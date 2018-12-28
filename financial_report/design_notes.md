@@ -14,7 +14,7 @@ Register new config options (eg settings for individual fields). Calls the regis
 
 _in:_ vis, dimensions, measures
 
-_updates:_ vis options (via registerOptions trigger)
+_updates:_ vis options (via ```registerOptions``` trigger)
 
 ### buildDimensionsArray
 
@@ -95,7 +95,7 @@ Simple array of all dimension names.
 
 ### dim_details
 
-Array of column definitions, using the Tabulator column definition structure. Concatenated with mea_details and supermeasures to provide the Tabulator object with an array of all columns.
+Array of column definitions, using the Tabulator column definition structure. Concatenated with mea_details and (not yet implemented) supermeasures to provide the Tabulator object with an array of all columns.
 
 ### tbl_data
 
@@ -107,11 +107,11 @@ Simple array of all measure names.
 
 ### mea_details
 
-Array of column definitions, using the Tabulator column definition structure. Concatenated with dim_details and supermeasures to provide the Tabulator object with an array of all columns.
+Array of column definitions, using the Tabulator column definition structure. Concatenated with dim_details and (not yet implemented) supermeasures to provide the Tabulator object with an array of all columns.
 
 ### table_col_details
 
-The complete array of column definitions, a concatenation of dim_details, mea_details and supermeasures.
+The complete array of column definitions, a concatenation of ```dim_details```, ```mea_details``` and (not yet implemented) supermeasures.
 
 ### group_by
 
@@ -123,13 +123,23 @@ Field used for sorting table on display – currently hard-coded to the first di
 
 ### tbl
 
-The Tabulator table object itself, tied to the __finance_tabulator__ HTML element.
+The Tabulator table object itself, tied to the ```finance_tabulator``` HTML element.
 
 
 ## Flat Table
 
+Flat tables are easy! No additional vis-level variables required.
 
 ## Pivot Table
+
+Pivot tables require additional processing. The pivot fields must be converted in to Tabulator column groups. This means that the Tabulator's ```columns``` property is no longer a simple array of column definitions, but is now represented as the __Measures Tree__, a nested array of arbitrary depth. As the depth is not known in advance, a couple of recursive functions are used to dynamically create the tree.
+
+Creating the __Measures Tree__ involves three functions:
+
+1. __buildMeasuresTree__ – the main function
+2. __insertColumnGroup__ - recursive function to add column groups (branches) to the tree
+3. __insertMeasuresArray__ – recursive function to add arrays of measures (leaves) to the tree
+
 
 ### pivot_depth _(pivot_fields.length)_
 
