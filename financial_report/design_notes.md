@@ -82,6 +82,8 @@ Required user options for the vis.
 
 ## From Looker
 
+These variables are provided by Looker as part of the Custom Vis API. The API's updateAsync function includes ```data, element, config, queryResponse, details, done``` parameters. The data structures of particular interest are:
+
 ### dimensions _(queryResponse.fields.dimension_like)_
 
 Array of all dimension-like objects, including dimensions, custom dimensions and table calcs.
@@ -100,6 +102,8 @@ Array of all pivot index objects, that is the objects that describe every pivot 
 
 
 ## All Tables
+
+These variables are used for all variations of the vis. They are effectively global (within the context of a custom vis plugin).
 
 ### dim_names
 
