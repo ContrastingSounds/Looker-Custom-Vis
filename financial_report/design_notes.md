@@ -5,21 +5,28 @@
 Given a nested array and an index reference (in the form of an array), returns the object at that index.
 
 _in:_ nestedArray, pathArr
-_out:_ object
+
+_returns:_ object
 
 ### updateOptionsPanel
 
 Register new config options (eg settings for individual fields). Calls the registerOptions trigger provided by Looker Custom Vis API.
 
 _in:_ vis, dimensions, measures
+
 _updates:_ vis options (via registerOptions trigger)
 
 ### buildDimensionsArray
 
 _in:_ dimensions
-_out:_ dim_names
+
+_returns:_ dim_names
 
 ### buildDimensionDefinitions
+
+_in:_ dimensions, config
+
+_returns:_ dim_details
 
 ### buildTableSpine
 
@@ -39,61 +46,96 @@ _out:_ dim_names
 
 ### updateDataTableWithMeasureValues
 
+
 # Simplified Data Structures
 
 ## Globals, settings
 
-number_formats
+### number_formats
 
-formatters
+Map of format names to parameter settings.
 
-themeFinancialTable
+### formatters
 
-global_options
+Map of formatter names to functions.
+
+### themeFinancialTable
+
+CSS Stylesheet for the vis.
+
+### global_options
+
+Required user options for the vis.
 
 
 ## From Looker
 
-dimensions (queryResponse.fields.dimension_like)
+### dimensions _(queryResponse.fields.dimension_like)_
 
-measures (queryResponse.fields.measure_like)
+Array of all dimension-like objects, including dimensions, custom dimensions and table calcs.
 
-pivot_fields (config.query_fields.pivots)
+### measures _(queryResponse.fields.measure_like)_
 
-pivot_index (queryResponse.pivots)
+Array of all measure-like objects, including measures, custom measures and table calcs.
+
+### pivot_fields _(config.query_fields.pivots)_
+
+Array of pivot field objects, including their sort order index.
+
+### pivot_index _(queryResponse.pivots)_
+
+Array of all pivot index objects, that is the objects that describe every pivot column in the dataset. Includes their key, which combined with a measure name uniquely identifies a column in the dataset.
+
 
 ## All Tables
 
-dim_names
+### dim_names
 
-dim_definition
+Simple array of all dimension names.
 
-dim_details
+### dim_details
 
-tbl_data
+Array of column definitions, using the Tabulator column definition structure. Concatenated with mea_details and supermeasures to provide the Tabulator object with an array of all columns.
 
-mea_names
+### tbl_data
 
-mea_definition
+Array of table data, using the Tabulator row definition structure. Field properties must match exactly to the fields defined in dim_details.
 
-mea_details
+### mea_names
 
-table_col_details
+Simple array of all measure names.
 
-group_by
+### mea_details
 
-initial_sort
+Array of column definitions, using the Tabulator column definition structure. Concatenated with dim_details and supermeasures to provide the Tabulator object with an array of all columns.
 
-tbl
+### table_col_details
+
+The complete array of column definitions, a concatenation of dim_details, mea_details and supermeasures.
+
+### group_by
+
+Field used for grouping – based on user options
+
+### initial_sort
+
+Field used for sorting table on display – currently hard-coded to the first dimension.
+
+### tbl
+
+The Tabulator table object itself, tied to the __finance_tabulator__ HTML element.
+
 
 ## Flat Table
 
+
 ## Pivot Table
 
-pivot_depth (pivot_fields.length)
+### pivot_depth _(pivot_fields.length)_
+
 
 ## Pivot Table with Spark Lines
 
-pivot_depth (pivot_fields.length)
+### pivot_depth _(pivot_fields.length - 1)_
 
-spark_index (filtered version of pivot_index)
+### spark_index _(filtered version of pivot_index)_

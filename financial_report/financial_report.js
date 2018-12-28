@@ -1211,6 +1211,9 @@ buildMeasuresFlat = function(measures, config) {
   return mea_details
 }
 
+// TODO: buildSparklinePivotIndex that builds spark_index
+
+// TODO: change/rename current getSparklinePivotIndex to getSparklineFieldName
 /**
  * Constructs a new column reference for pivoted tables with a sparkline
  * This requires all but the last pivot field.
