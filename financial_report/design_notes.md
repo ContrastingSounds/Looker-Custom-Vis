@@ -1,8 +1,8 @@
 # Financial Table Design Notes
 
 - Simplified Data Structures
-  - Globals, settings
   - From Looker
+  - Globals, settings
   - All Tables
   - Flat Tables
 - Functions
