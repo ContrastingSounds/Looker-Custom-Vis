@@ -6,6 +6,7 @@
   - All Tables
   - Flat Tables
 - Functions
+- Constructing a table
 - Pivot Tables
   - Pivots without Sparklines
   - Pivots with Sparklines
@@ -93,10 +94,6 @@ Field used for sorting table on display – currently hard-coded to the first di
 
 The Tabulator table object itself, tied to the ```finance_tabulator``` HTML element.
 
-## Flat Tables
-
-Flat tables are easy! No additional vis-level variables required.
-
 
 # Functions
 
@@ -146,6 +143,25 @@ _returns:_ dim_details
 
 ### updateDataTableWithMeasureValues
 
+
+# Constructing a table
+
+1. Clear errors, the old vis, the data table
+2. Set style
+3. Validate config. May restrict the depth of pivots allowed based on behaviour seen so far.
+4. Handle dimensions
+   - Add rows to data table
+   - Create array of column definitions
+5. Handle measures
+   - Add rows to data table: updateDataTableWithMeasureValues()
+     - Three variations: pivoted, pivoted with spark lines, flat
+   - Create column definitions
+     - Pivot table: buildMeasuresTree()
+     - Flat table: buildMeasuresArray() 
+   - Append measure columns to dimenion columns
+6. Set group_by, if set in user config
+7. Set sort order (currently defaulting to first dimension column)
+8. Render Tabulator table
 
 # Pivot Tables
 
