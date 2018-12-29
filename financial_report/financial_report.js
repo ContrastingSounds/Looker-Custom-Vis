@@ -965,7 +965,7 @@ buildDimensionDefinitions = function(dimensions, config) {
  * This will later be enriched with measures and supermeasures.
  */
 buildTableSpine = function(data, dim_names) {
-  var tbl_data = []
+  var tabulator_data = []
   for (j = 0; j < data.length; j++) {
     var row = {id: j};
 
@@ -975,9 +975,9 @@ buildTableSpine = function(data, dim_names) {
         
         row[safe_name] = data[j][raw_name].value
     }
-    tbl_data.push(row)
+    tabulator_data.push(row)
   }
-  return tbl_data  
+  return tabulator_data  
 }
 
 /**
@@ -1097,7 +1097,7 @@ buildMeasuresTree = function(pivot_fields, column_keys, measures, config) {
   // Initialise tree
   // column_idx: array indices so that columns and groups can be added at right place
   // column_latest: most recent value seen for a pivot field
-  column_tree = [
+  measures_tree = [
     {
       title: "PIVOTED MEASURES",
       columns: []
@@ -1135,7 +1135,7 @@ buildMeasuresTree = function(pivot_fields, column_keys, measures, config) {
             columns: []
           }
           // console.log('ADDING NEW COLUMN GROUP AT PIVOT INDEX', i)
-          insertColumnGroup(new_column_group, column_tree[0], tree_index);
+          insertColumnGroup(new_column_group, measures_tree[0], tree_index);
         }
 
         // If final pivot, push measures into the final column group
@@ -1164,12 +1164,12 @@ buildMeasuresTree = function(pivot_fields, column_keys, measures, config) {
         mea_definition = applyMeasureFormat(mea_object, mea_definition, config);
         measures_array.push(mea_definition);
       }
-      console.log("calling insertMeasuresArray with", measures_array, column_tree[0], tree_index)
-      insertMeasuresArray(measures_array, column_tree[0], tree_index) ;
+      console.log("calling insertMeasuresArray with", measures_array, measures_tree[0], tree_index)
+      insertMeasuresArray(measures_array, measures_tree[0], tree_index) ;
     }
   }  
 
-  return column_tree[0].columns
+  return measures_tree[0].columns
 }
 
 /**
@@ -1242,7 +1242,7 @@ getSparklinePivotIndex = function(pivot_fields, pivot_index, pivot_index_num) {
  *
  *
  */
-updateDataTableWithMeasureValues = function(data, tbl_data, pivot_fields, mea_names, config) {
+updateDataTableWithMeasureValues = function(data, tabulator_data, pivot_fields, mea_names, config) {
   spark_index = [];
   if (pivot_fields.length > 0) {
     for (i = 0; i < data.length; i++) {                        // Per row in dataset
@@ -1273,7 +1273,7 @@ updateDataTableWithMeasureValues = function(data, tbl_data, pivot_fields, mea_na
                   for (p = 0; p < pivot_fields.length-1; p++) {
                     index_data[pivot_fields[p].name] = pivot_index[k].data[pivot_fields[p].name]
                   }
-                  tbl_data[i][field_name] = spark_values;
+                  tabulator_data[i][field_name] = spark_values;
 
                   index_entry = {
                     data: index_data,
@@ -1310,7 +1310,7 @@ updateDataTableWithMeasureValues = function(data, tbl_data, pivot_fields, mea_na
                 // console.log("Value Index", i, raw_name, pivot_name)
                 // console.log("Data row", data[i])
               }
-              if (data_value) { tbl_data[i][field_name] = data_value; } 
+              if (data_value) { tabulator_data[i][field_name] = data_value; } 
             }
           } 
         }     
@@ -1323,7 +1323,7 @@ updateDataTableWithMeasureValues = function(data, tbl_data, pivot_fields, mea_na
           var raw_name = mea_names[i]
           var safe_name = mea_names[i].replace(".", "|")
           
-          tbl_data[j][safe_name] = data[j][raw_name].value;
+          tabulator_data[j][safe_name] = data[j][raw_name].value;
       }
     }
     return []
@@ -1372,7 +1372,7 @@ looker.plugins.visualizations.add({
   updateAsync: function(data, element, config, queryResponse, details, done) {
     // Clear any errors from previous updates.
     this.clearErrors();
-    delete tbl_data;
+    delete this.tabulator_data;
 
     // destory old viz if already exists
     if ($("#finance_tabulator").hasClass("tabulator")) { 
@@ -1404,7 +1404,7 @@ looker.plugins.visualizations.add({
 
     // HANDLE DIMENSIONS
     var dim_names = buildDimensionNamesArray(dimensions);
-    var tbl_data = buildTableSpine(data, dim_names);
+    var tabulator_data = buildTableSpine(data, dim_names);
     var dim_details = buildDimensionDefinitions(dimensions, config);
 
     console.log("Dimensions:", dim_names)
@@ -1430,7 +1430,7 @@ looker.plugins.visualizations.add({
     var mea_names = buildMeasureNamesArray(measures);
     console.log("Measures:", mea_names)
 
-    spark_index = updateDataTableWithMeasureValues(data, tbl_data, pivot_fields, mea_names, config);
+    spark_index = updateDataTableWithMeasureValues(data, tabulator_data, pivot_fields, mea_names, config);
 
     // Update column definitions with measures information
     if (pivot_fields.length > 0) {
@@ -1447,7 +1447,7 @@ looker.plugins.visualizations.add({
 
     // DEBUG CHECK
     console.log("table_col_details", table_col_details)
-    console.log("tbl_data", tbl_data)
+    console.log("tabulator_data", tabulator_data)
 
     if (config.use_grouping == true) {
         group_by = config.group_by
@@ -1460,7 +1460,7 @@ looker.plugins.visualizations.add({
     if (render_table) {
       var tbl = $("#finance_tabulator").tabulator({
         virtualDom: false,
-        data: tbl_data,           //load row data from array
+        data: tabulator_data,           //load row data from array
         layout:"fitDataFill",      // fit columns to data, but also fill full table width
         // responsiveLayout: "hide",  //hide columns that dont fit on the table
         
