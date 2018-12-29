@@ -217,9 +217,7 @@ _returns:_ measures_tree
 
 For pivoted tables, builds a Measures Tree of column groups and definitions. This nested array will be concatenated to the existing array of dimension columns
 
-Algorithm:
-
-TODO: Document the process! And figure out spark lines :)
+This and related functions are described in detail in the Pivot Tables section.
 
 ### buildMeasureNamesArray
 
@@ -272,13 +270,19 @@ lines are to be used.
 
 # Pivot Tables
 
-Pivot tables require additional processing. The pivot fields must be converted in to Tabulator column groups. This means that the Tabulator's ```columns``` property is no longer a simple array of column definitions, but is now represented as the __Measures Tree__, a nested array of arbitrary depth. As the depth is not known in advance, a couple of recursive functions are used to dynamically create the tree.
+Pivot tables require additional processing. The pivot fields must be converted in to Tabulator column groups, and measure values stored in tabulator_data must be correctly labeled. 
+
+
+## Measures Tree
+This means that the Tabulator's ```columns``` property is no longer a simple array of column definitions, but is now represented as the __Measures Tree__, a nested array of arbitrary depth. As the depth is not known in advance, a couple of recursive functions are used to dynamically create the tree.
 
 Creating the __Measures Tree__ involves three functions:
 
 1. __buildMeasuresTree__ – the main function
 2. __insertColumnGroup__ - recursive function to add column groups (branches) to the tree
 3. __insertMeasuresArray__ – recursive function to add arrays of measures (leaves) to the tree
+
+## Building tabulator_data
 
 ## Pivot Tables without Spark Lines
 
