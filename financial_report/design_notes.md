@@ -188,7 +188,7 @@ _updates:_ measures_tree
 
 Adds a Tabulator column group object, which represent a new branch in the Measures Tree.
 
-### insertMeasuresArray
+### insertMeasuresLeaves
 
 _parameters:_ measures_array, branch, index, iteration=1
 
@@ -219,7 +219,7 @@ For pivoted tables, builds a Measures Tree of column groups and definitions. Thi
 
 This and related functions are described in detail in the Pivot Tables section.
 
-### buildMeasureNamesArray
+### buildMeasureNames
 
 _parameters:_ measures
 

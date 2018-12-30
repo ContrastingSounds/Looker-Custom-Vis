@@ -1010,9 +1010,9 @@ insertColumnGroup = function(group, branch, index, iteration=1) {
  * Adds an array of measures as leaves on the Measures Tree (using Tabulator column definitions)
  * Recursive in order to support trees/pivots of arbitrary depth
  */
-insertMeasuresArray = function(measures_array, branch, index, iteration=1) {
+insertMeasuresLeaves = function(measures_array, branch, index, iteration=1) {
   if (debug) {
-    console.log("insertMeasuresArray, depth:", iteration);
+    console.log("insertMeasuresLeaves, depth:", iteration);
     console.log("--measures_array:", measures_array);
     console.log("--branch:", branch);
     console.log("--index:", index);
@@ -1024,7 +1024,7 @@ insertMeasuresArray = function(measures_array, branch, index, iteration=1) {
   } else {
     branch_index = index[iteration - 1];
     sub_branch = branch.columns[branch_index];
-    insertMeasuresArray(measures_array, sub_branch, index, iteration + 1);    
+    insertMeasuresLeaves(measures_array, sub_branch, index, iteration + 1);    
   }
 }
 
@@ -1088,94 +1088,95 @@ applyMeasureFormat = function(mea_object, mea_definition, config) {
  * 
  *  
  */
-buildMeasuresTree = function(pivot_fields, column_keys, measures, config) {
-  for (i = 0; i < pivot_fields.length; i++) {
-    if (debug) {  console.log(i, pivot_fields[i].name); }
+buildMeasuresTree = function(fields, keys, depth, metrics, config) {
+  for (branch = 0; branch < fields.length; branch++) {
+    if (debug) {  console.log(branch, fields[branch].name); }
   }
-  console.log("column_keys", column_keys)
+  console.log("keys", keys)
 
   // Initialise tree
-  // column_idx: array indices so that columns and groups can be added at right place
-  // column_latest: most recent value seen for a pivot field
-  measures_tree = [
+  tree = [
     {
       title: "PIVOTED MEASURES",
       columns: []
     }
   ];
-  column_idx = [];
-  column_latest = [];
 
-  for (j = 0; j < pivot_depth; j++) {
-    column_idx[j] = -1;
-    column_latest[j] = null;
+  // branch_addr: array indices so that columns and groups can be added at right place
+  // latest_value: most recent value seen for a pivot field
+  branch_addr = [];
+  latest_value = [];
+  for (level = 0; level < depth; level++) {
+    branch_addr[level] = -1;
+    latest_value[level] = null;
   }    
 
-  for (i = 0; i < column_keys.length; i++) {
-    if (column_keys[i].key != "$$$_row_total_$$$") {
-      for (j = 0; j < pivot_fields.length; j++) {
+  for (branch = 0; branch < keys.length; branch++) {
+    key = keys[branch].key 
+    if (key != "$$$_row_total_$$$") {
+      for (level = 0; level < fields.length; level++) {
         // TODO: This function is isolating individual fields in the pivot key
         //   but for sparklines, we've built a new array of indices which doesn't have the .data
         //   So we need to do something slightly different.
         //   - can the spark_index be built out of raw_names?
         //   - does the spark_index need to be built out of [raw_name, safe_name] tuples?
         //   - is there a javascript equivalent to Python's tuples?
-        current_pivot_value = column_keys[i].data[pivot_fields[j].name];
-        if (current_pivot_value != column_latest[j]) {
-          column_idx[j]++;
-          for (k = j + 1; k < pivot_fields.length; k++) {
-            column_idx[k] = -1;
-            column_latest[k] = null;
+        current_value = keys[branch].data[fields[level].name];
+        if (current_value != latest_value[level]) {
+          branch_addr[level]++;
+          for (next = level + 1; next < fields.length; next++) {
+            branch_addr[next] = -1;
+            latest_value[next] = null;
           }
-          column_latest[j] = current_pivot_value;
+          latest_value[level] = current_value;
 
-          tree_index = column_idx.slice(0, j + 1);
+          tree_index = branch_addr.slice(0, level + 1);
           new_column_group = {
-            title: current_pivot_value,
+            title: current_value,
             columns: []
           }
           // console.log('ADDING NEW COLUMN GROUP AT PIVOT INDEX', i)
-          insertColumnGroup(new_column_group, measures_tree[0], tree_index);
+          insertColumnGroup(new_column_group, tree[0], tree_index);
         }
 
-        // If final pivot, push measures into the final column group
-        if (j + 1 == pivot_depth) {
-          tree_index = column_idx.concat([0])
+        // If final pivot, get the tree_index where the leaves will be inserted
+        if (level + 1 == depth) {
+          tree_index = branch_addr.concat([0])
         }
       }
 
       // Once we have the indices for the current column group, push in all the measures
-      measures_array = []
-      for (m = 0; m < measures.length; m++) {
-        mea_object = measures[m];
-        safe_name = column_keys[i].key + '|' + mea_object.name.replace(".", "|");
+      leaves = []
+      for (metric = 0; metric < metrics.length; metric++) {
+        looker_definition = metrics[metric];
+        safe_name = key + '|' + looker_definition.name.replace(".", "|");
 
-        if (measures[m].hasOwnProperty("label_short")) {
-          measure_title = mea_object.label_short
+        if (metrics[metric].hasOwnProperty("label_short")) {
+          metric_title = looker_definition.label_short
         } else {
-          measure_title = mea_object.label
+          metric_title = looker_definition.label
         }
 
-        mea_definition = {
-          title: measure_title,
+        tabulator_definition = {
+          title: metric_title,
           field: safe_name,
           align: mea_object.align,
         }
-        mea_definition = applyMeasureFormat(mea_object, mea_definition, config);
-        measures_array.push(mea_definition);
+        tabulator_definition = applyMeasureFormat(looker_definition, tabulator_definition, config);
+        leaves.push(tabulator_definition);
       }
-      console.log("calling insertMeasuresArray with", measures_array, measures_tree[0], tree_index)
-      insertMeasuresArray(measures_array, measures_tree[0], tree_index) ;
+      console.log("calling insertMeasuresLeaves with", leaves, tree[0], tree_index)
+      insertMeasuresLeaves(leaves, tree[0], tree_index) ;
     }
   }  
 
-  return measures_tree[0].columns
+  return tree[0].columns
 }
 
 /**
  * Simple function to build array of measure names
  */
-buildMeasureNamesArray = function(measures) {
+buildMeasureNames = function(measures) {
   mea_names = []
   for (var i = 0; i < measures.length; i++) {
     mea_names.push(measures[i].name)
@@ -1219,11 +1220,11 @@ buildMeasuresFlat = function(measures, config) {
  * This requires all but the last pivot field.
  * TODO: this should probably be done with a .join() method, and probably just inline
  */
-getSparklinePivotIndex = function(pivot_fields, pivot_index, pivot_index_num) {
-  var new_name = pivot_index[pivot_index_num].data[pivot_fields[0].name];
-  var pivot_depth = pivot_fields.length - 1;
-  for (i = 1; i < pivot_depth; i++) {
-    new_name += '|' + pivot_index[pivot_index_num].data[pivot_fields[i].name];
+getSparklinePivotIndex = function(fields, keys, key) {
+  var new_name = keys[key].data[fields[0].name];
+  var depth = fields.length - 1;
+  for (i = 1; i < depth; i++) {
+    new_name += '|' + keys[key].data[fields[i].name];
   }
   return new_name
 }
@@ -1242,75 +1243,64 @@ getSparklinePivotIndex = function(pivot_fields, pivot_index, pivot_index_num) {
  *
  *
  */
-updateDataTableWithMeasureValues = function(data, tabulator_data, pivot_fields, mea_names, config) {
+updateDataTableWithMeasureValues = function(data_in, data_out, fields, keys, metrics, vis_config) {
   spark_index = [];
-  if (pivot_fields.length > 0) {
-    for (i = 0; i < data.length; i++) {                        // Per row in dataset
-      for (var j = 0; j < mea_names.length; j++) {             // Per measure
-        raw_name = mea_names[j]
+  if (fields.length > 0) {
+    for (row = 0; row < data_in.length; row++) {         
+      for (var metric = 0; metric < metrics.length; metric++) {
+        raw_name = metrics[metric]
         safe_name = raw_name.replace(".", "|")
-        if (i==3) {console.log("raw_name", raw_name)}
+        if (row==3) {console.log("raw_name", raw_name)}       // Avoid first row for debug output
 
-        if (config.use_sparklines) { // Only if using sparklines do we need to build an array
-          spark_name = null;
-          spark_values = [];
-        }
+        spark_key_value = null;
+        spark_values = [];
 
-        for (k = 0; k < pivot_index.length; k++) {             // Per column
-          if (pivot_index[k].key != "$$$_row_total_$$$") {     // Ignore row_totals for now
-            if (config.use_sparklines) {
-              var new_spark_name = getSparklinePivotIndex(pivot_fields, pivot_index, k)
-              var pivot_name = pivot_index[k].key
-              if (i==3) {console.log("new_spark_name, spark_name", new_spark_name, spark_name)}
+        for (key = 0; key < keys.length; key++) {
+          key_value = keys[key].key
+          if (key_value != "$$$_row_total_$$$") {     // Ignore row_totals for now
+            if (vis_config.use_sparklines) {
+              var latest_spark_key_value = getSparklinePivotIndex(fields, keys, key)
+              if (row==3) {console.log("new_spark_name, spark_name", latest_spark_key_value, spark_key_value)}
 
               // If the spark_name has changed, "flush" the current values into a data entry
               // Also store the index, using same data structure as the pivot_index
-              if (new_spark_name != spark_name) {
-                if (i==3) {console.log("spark_name has changed", new_spark_name, spark_name, spark_values)}
-                if (spark_name != null && spark_values) {
-                  var field_name = spark_name + '|' + safe_name
+              if (latest_spark_key_value != spark_key_value) {
+                if (row==3) {console.log("spark_name has changed", latest_spark_key_value, spark_key_value, spark_values)}
+                if (spark_key_value != null && spark_values) {
+                  var field_name = spark_key_value + '|' + safe_name
                   var index_data = {}
-                  for (p = 0; p < pivot_fields.length-1; p++) {
-                    index_data[pivot_fields[p].name] = pivot_index[k].data[pivot_fields[p].name]
+                  for (field = 0; field < fields.length-1; field++) {
+                    index_data[fields[field].name] = keys[key].data[fields[field].name]
                   }
-                  tabulator_data[i][field_name] = spark_values;
+                  data_out[row][field_name] = spark_values;
 
                   index_entry = {
                     data: index_data,
                     key: field_name
                   }
                   spark_index.push(index_entry)
-                  if (i==3) {console.log("FLUSH VALUES: ", field_name, index_entry, spark_values)}
+                  if (row==3) {console.log("FLUSH VALUES: ", field_name, index_entry, spark_values)}
 
                 }
 
-                if (typeof data[i][raw_name][pivot_name] !== 'undefined') {
-                  var data_value = data[i][raw_name][pivot_name].value
+                if (typeof data_in[row][raw_name][key_value] !== 'undefined') {
+                  var data_value = data_in[row][raw_name][key_value].value
                   spark_values = [data_value];
-                  if (i==3) { console.log("raw_name", raw_name, data_value)  }
+                  if (row==3) { console.log("raw_name", raw_name, data_value)  }
                 }
 
-                spark_name = new_spark_name;
+                spark_key_value = latest_spark_key_value;
 
               } else { // Otherwise, just push the current value into spark_values
-                if (typeof data[i][raw_name][pivot_name] !== 'undefined') {
-                  var data_value = data[i][raw_name][pivot_name].value
+                if (typeof data_in[row][raw_name][key_value] !== 'undefined') {
+                  var data_value = data_in[row][raw_name][key_value].value
                   spark_values.push(data_value);
                 }
               }  
 
             } else {
-              var pivot_name = pivot_index[k].key
-              var field_name = pivot_name + '|' + safe_name
-
-              if (debug) {
-                // console.log("Measure pivot_name", pivot_name)
-                // console.log("Measure raw_name", raw_name)
-                // console.log("Measure safe_name", safe_name)
-                // console.log("Value Index", i, raw_name, pivot_name)
-                // console.log("Data row", data[i])
-              }
-              if (data_value) { tabulator_data[i][field_name] = data_value; } 
+              var field_name = key_value + '|' + safe_name
+              if (data_value) { data_out[row][field_name] = data_value; } 
             }
           } 
         }     
@@ -1318,12 +1308,12 @@ updateDataTableWithMeasureValues = function(data, tabulator_data, pivot_fields, 
     }
     return spark_index
   } else {
-    for (j = 0; j < data.length; j++) {
-      for (var i = 0; i < mea_names.length; i++) {
-          var raw_name = mea_names[i]
-          var safe_name = mea_names[i].replace(".", "|")
+    for (row = 0; row < data_in.length; row++) {
+      for (var metric = 0; metric < metrics.length; metric++) {
+          var raw_name = metrics[metric]
+          var safe_name = metrics[metric].replace(".", "|")
           
-          tabulator_data[j][safe_name] = data[j][raw_name].value;
+          data_out[row][safe_name] = data_in[row][raw_name].value;
       }
     }
     return []
@@ -1356,6 +1346,7 @@ updateDataTableWithMeasureValues = function(data, tabulator_data, pivot_fields, 
  *  8. Render Tabulator table
  */
 looker.plugins.visualizations.add({
+  console.log("looker.plugins.visualizations.add() called");
 
   options: global_options,
 
@@ -1370,6 +1361,7 @@ looker.plugins.visualizations.add({
   },
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
+    console.log("update function called");
     // Clear any errors from previous updates.
     this.clearErrors();
     delete this.tabulator_data;
@@ -1423,14 +1415,10 @@ looker.plugins.visualizations.add({
     console.log("Pivot Depth", pivot_depth, pivot_fields.slice(0, pivot_depth))
 
     // HANDLE MEASURES
-
-    spark_index = []
-    measures = queryResponse.fields.measure_like;
-
-    var mea_names = buildMeasureNamesArray(measures);
+    var mea_names = buildMeasureNames(measures);
     console.log("Measures:", mea_names)
 
-    spark_index = updateDataTableWithMeasureValues(data, tabulator_data, pivot_fields, mea_names, config);
+    spark_index = updateDataTableWithMeasureValues(data, tabulator_data, pivot_fields, pivot_index, mea_names, config);
 
     // Update column definitions with measures information
     if (pivot_fields.length > 0) {
