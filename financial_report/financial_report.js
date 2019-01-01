@@ -1350,7 +1350,10 @@ updateDataTableWithMeasureValues = function(data_in, data_out, fields, keys, met
 
             } else {
               var field_name = key_value + '|' + safe_name
-              if (data_value) { data_out[row][field_name] = data_value; } 
+              data_value = data_in[row][raw_name][key_value].value
+              if (data_value) {
+                data_out[row][field_name] = data_value; 
+              } 
             }
           } 
         }     
