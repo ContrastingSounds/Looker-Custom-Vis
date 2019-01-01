@@ -243,7 +243,16 @@ _returns:_ new_name
 
 Simple function to return the field name required for a sparkline measure column in a pivoted table. This is a concatenation of all but the last field value, as the last field value becomes the index to the data array representing the sparkline.
 
-TODO: Probably this can be simplified and the logic just applied inline rather than as a separate function. 
+TODO: Probably this can be simplified and the logic just applied inline rather than as a separate function.
+
+### buildSparklinePivotIndex
+
+_parameters:_ fields, keys, depth
+
+_updates:_ pivot_index 
+
+Tables with sparklines require a different set of pivot keys, as the final pivot field "disappears" into the array of data points for the sparkline itself. This function enriches the pivot_index with a key value for the new spark_index.
+
 
 ### updateDataTableWithMeasureValues
 
