@@ -82,8 +82,17 @@ looker.plugins.visualizations.add({
         console.log("create() called");
         this.style = document.createElement('style');
         document.head.appendChild(this.style);
-        var container = element.appendChild(document.createElement("div"));
-        container.id = "treemapContainer";
+        // var container = element.appendChild(document.createElement("div"));
+        // container.id = "treemapContainer";
+
+        this.container = d3.select(element)
+            .append("div")
+            .attr("id", "treemapContainer")
+
+        this.tooltip = d3.select(element)
+            .append("div")
+            .attr("class", "hidden")
+            .attr("id", "tooltip")
     },
 
     updateAsync: function(data, element, config, queryResponse, details, done) {
