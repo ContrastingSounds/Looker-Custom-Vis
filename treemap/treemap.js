@@ -96,8 +96,8 @@ looker.plugins.visualizations.add({
         var vis = this;
 
         var margin = {top: 20, right: 0, bottom: 0, left: 0};
-        var chartWidth = element.clientWidth
-        var chartHeight = element.clientHeight
+        var chartWidth = element.clientWidth;
+        var chartHeight = element.clientHeight - 16;
 
         var headerHeight = margin.top;
         var headerColor = "orange";
@@ -204,16 +204,11 @@ looker.plugins.visualizations.add({
             return tiptext;
         }
 
-        var svg = d3.select("body")
-            .append("svg")
-            .attr("width", chartWidth)
-            .attr("height", chartHeight);
-
         var create_treemap = function(data) {
             var nested_data = d3.nest();
-
-            dimensions.forEach(dim => nested_data.key(d => dim));
-            nested_data.entries(data);
+            dimensions.forEach(dim => 
+                nested_data = nested_data.key(d => d[dim.name]));
+            nested_data = nested_data.entries(data);
             nested_data = {
                 "key": "root",
                 "values": nested_data,
@@ -231,8 +226,16 @@ looker.plugins.visualizations.add({
                 console.log("Current breadcrumbs:", breadcrumbs);
                 console.log("Current treemap:", d);
 
-                svg.selectAll("*")
-                    .remove();
+                d3.select("#treemapSVG").remove();
+
+                var svg = d3.select("#treemapContainer")
+                            .append("svg")
+                            .attr("id", "treemapSVG")
+                            .attr("width", chartWidth)
+                            .attr("height", chartHeight);
+
+                // svg.selectAll("*")
+                //     .remove();
 
                 var treemapArea = svg.append("g")
                     .datum(d)
