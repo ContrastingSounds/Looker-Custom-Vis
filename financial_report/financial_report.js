@@ -9,11 +9,7 @@
 render_table = true;
 debug = false;
 
-// lineFormatter = function(cell, formatterParams){
-//     setTimeout(function(){ //give cell enough time to be added to the DOM before calling sparkline formatter
-//         cell.getElement().sparkline(cell.getValue(), {width:"100%", type:"line", disableTooltips:true});
-//     }, 10);
-//   };
+
 /**
  * Different Tablulator number formats to set the appearance of measure cells in the table
  * Used by the applyMeasureFormat() function.
@@ -47,7 +43,6 @@ number_formats = {
  * Different Tablulator formatters to set the appearance of measure cells in the table
  * Used by the applyMeasureFormat() function.
  */
-
 spark_line_config = {
   width:"100%", 
   type:"line", 
@@ -1160,12 +1155,6 @@ buildMeasuresTree = function(fields, keys, metrics, vis_config) {
           console.log('ADDING NEW COLUMN GROUP', current_branch_value, 'AT PIVOT INDEX', tree_index)
           insertColumnGroup(new_column_group, tree[0], tree_index);
         }
-
-        // If final pivot, get the tree_index where the leaves will be inserted
-        // if (level + 1 == depth) {
-        //   tree_index = branch_addr.concat([0])
-        //   console.log('NEW TREE INDEX FOR ADDING THE MEASURE LEAVES:', tree_index)
-        // }
       }
       tree_index.push(0)
       console.log('NEW TREE INDEX FOR ADDING THE MEASURE LEAVES:', tree_index)
@@ -1224,22 +1213,26 @@ buildMeasuresFlat = function(measures, config) {
     mea_names.push(mea_name)
     
     var safe_name = mea_name.replace(".", "|")
-    var mea_object = measures[i]
+    var looker_definition = measures[i]
 
-    mea_definition = {
-      title: mea_object.label_short,
-      field: safe_name,
-      align: mea_object.align,
+    if (looker_definition.hasOwnProperty("label_short")) {
+      measure_title = looker_definition.label_short
+    } else {
+      measure_title = looker_definition.label
     }
 
-    mea_definition = applyMeasureFormat(mea_object, mea_definition, config);
-    mea_details.push(mea_definition)
+    tabulator_definition = {
+      title: measure_title,
+      field: safe_name,
+      align: looker_definition.align,
+    }
+
+    tabulator_definition = applyMeasureFormat(looker_definition, tabulator_definition, config);
+    mea_details.push(tabulator_definition)
   }
 
   return mea_details
 }
-
-// TODO: buildSparklinePivotIndex that builds spark_index
 
 // TODO: change/rename current getSparklinePivotIndex to getSparklineFieldName
 /**
@@ -1247,14 +1240,14 @@ buildMeasuresFlat = function(measures, config) {
  * This requires all but the last pivot field.
  * TODO: this should probably be done with a .join() method, and probably just inline
  */
-getSparklinePivotIndex = function(fields, keys, key) {
-  var new_name = keys[key].data[fields[0].name];
-  var depth = fields.length - 1;
-  for (i = 1; i < depth; i++) {
-    new_name += '|' + keys[key].data[fields[i].name];
-  }
-  return new_name
-}
+// getSparklinePivotIndex = function(fields, keys, key) {
+//   var new_name = keys[key].data[fields[0].name];
+//   var depth = fields.length - 1;
+//   for (i = 1; i < depth; i++) {
+//     new_name += '|' + keys[key].data[fields[i].name];
+//   }
+//   return new_name
+// }
 
 /**
  * For every pivot key, enrich the original key with a new spark_key.
@@ -1273,7 +1266,7 @@ buildSparklinePivotIndex = function(fields, keys) {
       spark_key_values.push(field_value);
     }
 
-    spark_key = spark_key_values.join("|");
+    spark_key = spark_key_values.join("|FIELD|");
     keys[pivot_column]["spark_key"] = spark_key
 
     if (spark_key != current_spark_key) {
@@ -1291,15 +1284,6 @@ buildSparklinePivotIndex = function(fields, keys) {
  * Iterates through each data row and measure, adding each value to the data table using the
  * appropriate field name. The correct value and field depends on whether pivots and spark
  * lines are to be used.
- *
- * If pivoted with spark lines:
- *  1. 
- *
- * If pivoted without spark lines:
- *
- * If a flat table:
- *
- *
  */
 updateDataTableWithMeasureValues = function(data_in, data_out, fields, keys, metrics, vis_config) {
   if (fields.length > 0) {
@@ -1508,7 +1492,8 @@ looker.plugins.visualizations.add({
         pagination: false, //"local",       //paginate the data
         paginationSize: 10,         //allow 7 rows per page of data
         
-        movableColumns: false,      //allow column order to be changed
+        // persistentLayout:true,   // fails due to sandboxing
+        movableColumns: true,      //allow column order to be changed
         resizableColumns: true,
         resizableRows: false,       //allow row size to be changed
         
@@ -1525,6 +1510,15 @@ looker.plugins.visualizations.add({
         initialSort: [ {column: initial_sort, dir:"asc"} ],
         columns: table_col_details,
 
+        columnMoved:function(column, columns){
+        //column - column component of the moved column
+        //columns- array of columns in new order
+          // https://github.com/olifolkerd/tabulator/issues/362
+          var columnLayouts = $("#finance_tabulator").tabulator("getColumnLayout");
+          console.log("columnLayouts", columnLayouts);
+          console.log(JSON.stringify(columnLayouts));
+        },
+
         columnResized: function(column) {
           col_resize = {};
           col_resize["Width: " + column.column.definition.field] = column.column.width;
@@ -1535,7 +1529,7 @@ looker.plugins.visualizations.add({
             //function should return a string for the tooltip or false to hide the tooltip
             return  cell.getColumn().getDefinition().title + ": " + cell.getValue(); 
         },
-      });      
+      });
     } else {
       this._textElement.innerHTML = "Columns: " + table_col_details.length
     }

@@ -56,7 +56,7 @@ Tooltips only display the measure name and value currently. Set by the tables ``
 
 ## From Looker
 
-These variables are provided by Looker as part of the Custom Vis API. The API's updateAsync function includes ```data, element, config, queryResponse, details, done``` parameters. The data structures of particular interest are:
+These variables are provided by Looker as part of the Custom Vis API. The API's updateAsync function includes ```data, element, config, queryResponse, details, done``` parameters. The data structures of interest are:
 
 ### dimensions _(queryResponse.fields.dimension_like)_
 
@@ -306,3 +306,14 @@ Integer defining how many of the pivot fields to use. For pivot tables without s
 Integer defining how many of the pivot fields to use. For pivot tables with spark lines, the final field is not used, and this is equal to ```pivot_fields.length - 1```.
 
 ### spark_index _(filtered version of pivot_index)_
+
+
+# Dependencies
+https://cdnjs.cloudflare.com/ajax/libs/tabulator/3.5.2/js/tabulator.min.js
+https://unpkg.com/tabulator-tables@4.1.4/dist/js/tabulator.min.js
+
+https://code.jquery.com/jquery-3.3.1.min.js
+https://code.jquery.com/ui/1.12.1/jquery-ui.min.js
+https://cdnjs.cloudflare.com/ajax/libs/jquery-sparklines/2.1.2/jquery.sparkline.min.js
+
+
