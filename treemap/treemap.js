@@ -40,6 +40,19 @@ defaultTheme = `
     }
 `
 
+global_options = {
+  showSubHeaders: {
+    section: "Data",
+    type: "boolean",
+    label: "Show Sub Headers",
+    default: "true"
+  },
+  breadcrumbs: {
+    type: "array",
+    default: [],
+  }
+};
+
 convertQueryDatasetToVisData = function(data, queryResponse) {
     var vis_data = [];
     data.forEach(d => {
@@ -68,36 +81,36 @@ getMeasures = function(queryResponse) {
     return measures;
 }
 
-// updateConfigOptions = function(vis, old_config, measures) {
-//     console.log("updateConfigOption() ... measures:", measures);
-//     new_options = old_config;
-//     // size_by_options = [];
-//     // for (var i = 0; i < measures.length; i++) {
-//     //     option = {};
-//     //     option[measures[i]] = i;
-//     //     size_by_options.push(option);
-//     // }
+getNewConfigOptions = function(measures) {
+    new_options = global_options;
 
-//     // console.log("updateConfigOption() ... new_options:", new_options);
-//     // new_options["size_by"] = {
-//     //     section: "Data",
-//     //     type: "Number",
-//     //     label: "Size By",
-//     //     values: size_by_options,
-//     //     display: "select",
-//     //     default: 0,
-//     // }
+    size_by_options = [];
+    for (var i = 0; i < measures.length; i++) {
+        option = {};
+        option[measures[i]] = i.toString();
+        size_by_options.push(option);
+    }
+    size_by_options.push({"Count of Rows": "count_of_rows"});
+    console.log("size_by_options", size_by_options);
 
-//     new_options["showSubHeaders"] = {
-//         section: "Data",
-//         type: "boolean",
-//         label: "Size By Count",
-//         default: "true"
-//     };
+    new_options["sizeBy"] = {
+        section: "Data",
+        type: "string",
+        label: "Size By",
+        display: "select",
+        values: size_by_options,
+        default: "0",
+    }
 
-//     console.log("updateConfigOption() ... new_options:", new_options);
-//     vis.trigger('registerOptions', new_options);
-// }
+    // new_options["sizeByCount"] = {
+    //     section: "Data",
+    //     type: "boolean",
+    //     label: "Size by Count",
+    //     default: "true",
+    // }
+
+    return new_options;
+}
 
 looker.plugins.visualizations.add({
     options: {
@@ -159,7 +172,10 @@ looker.plugins.visualizations.add({
 
         var measures = getMeasures(queryResponse);
         console.log("Measures", measures);
-        // updateConfigOptions(vis, config, measures);
+
+        new_options = getNewConfigOptions(measures);
+        vis.trigger("registerOptions", new_options);
+        console.log("size by value", config["sizeBy"])
 
         var color = d3.scaleOrdinal(d3.schemeCategory20);
 
@@ -196,7 +212,13 @@ looker.plugins.visualizations.add({
         }
 
         var get_size = function(d) {
-            return parseFloat(d[measures[0]]);
+            if (config["sizeBy"] == "count_of_rows") {
+                console.log("get_size, d.key", d.key);
+                return !d.key ? 1 : 0;
+            } else {
+                idx = Number(config["sizeBy"]);
+                return parseFloat(d[measures[idx]]);    
+            }
         }
 
         var get_color = function(d) {
@@ -321,7 +343,7 @@ looker.plugins.visualizations.add({
                 treemapCells.append("foreignObject")
                     .attr("x", d => d.x0 + 3)
                     .attr("y", d => d.y0)
-                    .attr("width", d => d.x1 - d.x0)
+                    .attr("width", d => d.x1 - d.x0 - 3)
                     .attr("height", d => d.y1 - d.y0)
                     .attr("fill", '#bbbbbb')
                     .attr("class", "foreignobj")
