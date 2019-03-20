@@ -68,22 +68,55 @@ getMeasures = function(queryResponse) {
     return measures;
 }
 
+// updateConfigOptions = function(vis, old_config, measures) {
+//     console.log("updateConfigOption() ... measures:", measures);
+//     new_options = old_config;
+//     // size_by_options = [];
+//     // for (var i = 0; i < measures.length; i++) {
+//     //     option = {};
+//     //     option[measures[i]] = i;
+//     //     size_by_options.push(option);
+//     // }
+
+//     // console.log("updateConfigOption() ... new_options:", new_options);
+//     // new_options["size_by"] = {
+//     //     section: "Data",
+//     //     type: "Number",
+//     //     label: "Size By",
+//     //     values: size_by_options,
+//     //     display: "select",
+//     //     default: 0,
+//     // }
+
+//     new_options["showSubHeaders"] = {
+//         section: "Data",
+//         type: "boolean",
+//         label: "Size By Count",
+//         default: "true"
+//     };
+
+//     console.log("updateConfigOption() ... new_options:", new_options);
+//     vis.trigger('registerOptions', new_options);
+// }
+
 looker.plugins.visualizations.add({
     options: {
-      use_grouping: {
+      showSubHeaders: {
         section: "Data",
         type: "boolean",
-        label: "Placeholder Option",
+        label: "Show Sub Headers",
         default: "true"
       },
+      breadcrumbs: {
+        type: "array",
+        default: [],
+      }
     },
 
     create: function(element, config) {
         console.log("create() called");
         this.style = document.createElement('style');
         document.head.appendChild(this.style);
-        // var container = element.appendChild(document.createElement("div"));
-        // container.id = "treemapContainer";
 
         this.container = d3.select(element)
             .append("div")
@@ -112,12 +145,12 @@ looker.plugins.visualizations.add({
         var headerColor = "orange";
         var number_of_headers = 2;
 
-        var breadcrumbs = [];
+        // var breadcrumbs = [];
         var current_branch;
 
         var dimensions = queryResponse.fields.dimension_like;
         var measures = queryResponse.fields.measure_like;
-
+        
         vis_data = convertQueryDatasetToVisData(data, queryResponse);
         console.log("Treemap Data", vis_data);
 
@@ -126,6 +159,7 @@ looker.plugins.visualizations.add({
 
         var measures = getMeasures(queryResponse);
         console.log("Measures", measures);
+        // updateConfigOptions(vis, config, measures);
 
         var color = d3.scaleOrdinal(d3.schemeCategory20);
 
@@ -135,7 +169,12 @@ looker.plugins.visualizations.add({
                 return d.depth === 1 ? 2 : 0
             })
             .paddingTop((d) => {
-                return d.depth < number_of_headers ? 16 : 0
+                // console.log("updateAsync, d.count():", d.count());
+                if (config.showSubHeaders) {
+                    return d.depth < number_of_headers ? 16 : 0
+                } else {
+                    return d.depth === 0 ? 16 : 0
+                }
             })
             .round(true);
 
@@ -172,23 +211,22 @@ looker.plugins.visualizations.add({
             } else if (d.depth === 0) {
                 return headerColor;
             } else {
-                return "lightgrey";
+                return "AliceBlue";
             }
         }
 
         var get_cell_text = function(d) {
             if (d.depth === 0) {
-                if (breadcrumbs.length === 0) {
-                    cell_string = " – click on header cells to zoom in – "    
+                if (config.breadcrumbs.length === 0) {
+                    cell_string = " – Top Level: click on cells to zoom in, this bar to zoom out – "    
                 } else {
-                    cell_string = breadcrumbs.join(" – ")
+                    cell_string = config.breadcrumbs.join(" – ")
                 }
                 
-            } else if (d.depth < number_of_headers) {
+            } else if (d.depth < number_of_headers && config.showSubHeaders) {
                 cell_string = d.data.key;
             } else if (d.height === 0) {
-                // TODO: Replace with dynamic label
-                cell_string = d.data["products.item_name"];
+                cell_string = d.data[hierarchy[hierarchy.length - 1]];
             } else {
                 cell_string = "";
             }
@@ -232,7 +270,7 @@ looker.plugins.visualizations.add({
 
             function display_chart(d) {
                 console.log("Displaying chart for", d.data.key);
-                console.log("Current breadcrumbs:", breadcrumbs);
+                console.log("Current breadcrumbs:", config.breadcrumbs);
                 console.log("Current treemap:", d);
 
                 d3.select("#treemapSVG").remove();
@@ -242,9 +280,6 @@ looker.plugins.visualizations.add({
                             .attr("id", "treemapSVG")
                             .attr("width", chartWidth)
                             .attr("height", chartHeight);
-
-                // svg.selectAll("*")
-                //     .remove();
 
                 var treemapArea = svg.append("g")
                     .datum(d)
@@ -260,7 +295,7 @@ looker.plugins.visualizations.add({
                     .attr("width", d => d.x1 - d.x0)
                     .attr("height", d => d.y1 - d.y0)
                     .attr("fill", d => get_color(d))
-                    .attr("stroke", "lightgrey")
+                    .attr("stroke", "AliceBlue")
 
                     .on("mouseover", function(d) {
                         //Get this bar's x/y values, then augment for the tooltip
@@ -284,9 +319,9 @@ looker.plugins.visualizations.add({
                     .on("click", zoom)
 
                 treemapCells.append("foreignObject")
-                    .attr("x", d => d.x0 + 5)
+                    .attr("x", d => d.x0 + 3)
                     .attr("y", d => d.y0)
-                    .attr("width", d => d.x1 - d.x0 - 5)
+                    .attr("width", d => d.x1 - d.x0)
                     .attr("height", d => d.y1 - d.y0)
                     .attr("fill", '#bbbbbb')
                     .attr("class", "foreignobj")
@@ -296,17 +331,15 @@ looker.plugins.visualizations.add({
                     .attr("class", "textdiv"); //textdiv class allows us to style the text easily with CSS
             
                 function zoom(d) {
-                    if (d.height === 0 ) {
-                        console.log("leaf node – no zoom required");
-                    } else if (d.depth === 0) {
+                    if (d.depth === 0) {
                         console.log("zoom up called for");
-                        if (breadcrumbs.length === 0) {
+                        if (config.breadcrumbs.length === 0) {
                             console.log("zoom cancelled, already at root node")
                         } else {
-                            breadcrumbs.pop();
-                            console.log("zoom up to (breadcrumbs):", breadcrumbs);
+                            config.breadcrumbs.pop();
+                            console.log("zoom up to (breadcrumbs):", config.breadcrumbs);
                             
-                            update_current_branch(nested_data, breadcrumbs.slice(0));
+                            update_current_branch(nested_data, config.breadcrumbs.slice(0));
                             console.log("current_branch:", current_branch);
 
                             root = treemap(d3.hierarchy(current_branch, d => d.values)
@@ -314,9 +347,12 @@ looker.plugins.visualizations.add({
                             display_chart(root);
                         }
                     } else {
-                        // TODO: support for drilling down multiple levels at a time
-                        breadcrumbs.push(d.data.key);
-                        console.log("zoom down to (breadcrumbs):", breadcrumbs);
+                        while (d.depth > 1) {
+                            console.log("depth:", d.depth);
+                            d = d.parent;
+                        }
+                        config.breadcrumbs.push(d.data.key);
+                        console.log("zoom down to (breadcrumbs):", config.breadcrumbs);
                         root = treemap(d3.hierarchy(d.data, d => d.values)
                             .sum(d => get_size(d))
                         );
