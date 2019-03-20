@@ -47,6 +47,18 @@ global_options = {
     label: "Show Sub Headers",
     default: "true"
   },
+  takeColorFromCellValue: {
+    section: "Data",
+    type: "boolean",
+    label: "Color By Cell Value",
+    default: "true"
+  },
+  cellColor: {
+    section: "Data",
+    type: "array",
+    display: "colors",
+    label: "Color Palette",
+  },
   breadcrumbs: {
     type: "array",
     default: [],
@@ -81,7 +93,7 @@ getMeasures = function(queryResponse) {
     return measures;
 }
 
-getNewConfigOptions = function(measures) {
+getNewConfigOptions = function(dimensions, measures) {
     new_options = global_options;
 
     size_by_options = [];
@@ -91,7 +103,6 @@ getNewConfigOptions = function(measures) {
         size_by_options.push(option);
     }
     size_by_options.push({"Count of Rows": "count_of_rows"});
-    console.log("size_by_options", size_by_options);
 
     new_options["sizeBy"] = {
         section: "Data",
@@ -102,12 +113,21 @@ getNewConfigOptions = function(measures) {
         default: "0",
     }
 
-    // new_options["sizeByCount"] = {
-    //     section: "Data",
-    //     type: "boolean",
-    //     label: "Size by Count",
-    //     default: "true",
-    // }
+    color_by_options = [];
+    for (var i = 0; i < dimensions.length; i++) {
+        option = {};
+        option[dimensions[i].label] = dimensions[i].name;
+        color_by_options.push(option)
+    }
+
+    new_options["colorBy"] = {
+        section: "Data",
+        type: "string",
+        label: "Color By",
+        display: "select",
+        values: color_by_options,
+        default: "0",
+    }
 
     return new_options;
 }
@@ -173,11 +193,13 @@ looker.plugins.visualizations.add({
         var measures = getMeasures(queryResponse);
         console.log("Measures", measures);
 
-        new_options = getNewConfigOptions(measures);
+        new_options = getNewConfigOptions(dimensions, measures);
         vis.trigger("registerOptions", new_options);
-        console.log("size by value", config["sizeBy"])
+        console.log("colors", config["cellColor"]);
+        console.log("color by", config["colorBy"]);
 
-        var color = d3.scaleOrdinal(d3.schemeCategory20);
+        var colorScale = d3.scaleOrdinal()
+                            .range(config["cellColor"]);
 
         var treemap = d3.treemap()
             .size([chartWidth, chartHeight])
@@ -213,7 +235,6 @@ looker.plugins.visualizations.add({
 
         var get_size = function(d) {
             if (config["sizeBy"] == "count_of_rows") {
-                console.log("get_size, d.key", d.key);
                 return !d.key ? 1 : 0;
             } else {
                 idx = Number(config["sizeBy"]);
@@ -223,12 +244,10 @@ looker.plugins.visualizations.add({
 
         var get_color = function(d) {
             if (d.height === 0) {
-                if (d.data["products.category"] === "Shorts") {
-                    return "red";
-                } else if (d.data["products.category"] === "Plus") {
-                    return "yellow";
+                if (config.takeColorFromCellValue) {
+                    return d.data[config["colorBy"]];
                 } else {
-                    return "green";
+                    return colorScale(d.data[config["colorBy"]]);
                 }
             } else if (d.depth === 0) {
                 return headerColor;
@@ -248,7 +267,12 @@ looker.plugins.visualizations.add({
             } else if (d.depth < number_of_headers && config.showSubHeaders) {
                 cell_string = d.data.key;
             } else if (d.height === 0) {
-                cell_string = d.data[hierarchy[hierarchy.length - 1]];
+                if (config["sizeBy"] === "count_of_rows") {
+                    cell_string = "";
+                } else {
+                    idx = Number(config["sizeBy"]);
+                    cell_string = d.data[measures[idx]];                    
+                }
             } else {
                 cell_string = "";
             }
