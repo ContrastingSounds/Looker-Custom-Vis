@@ -37,6 +37,7 @@ defaultTheme = `
         font-size: 12px;
         pointer-events: none;
         overflow: none;
+        white-space: nowrap;
     }
 `
 
@@ -58,6 +59,7 @@ global_options = {
     type: "array",
     display: "colors",
     label: "Color Palette",
+    default: ["#62bad4", "#a9c574", "#929292", "#9fdee0", "#1f3e5a", "#90c8ae", "#92818d", "#c5c6a6", "#82c2ca", "#cee0a0", "#928fb4", "#9fc190"]
   },
   breadcrumbs: {
     type: "array",
@@ -178,7 +180,6 @@ looker.plugins.visualizations.add({
         var headerColor = "orange";
         var number_of_headers = 2;
 
-        // var breadcrumbs = [];
         var current_branch;
 
         var dimensions = queryResponse.fields.dimension_like;
@@ -207,7 +208,6 @@ looker.plugins.visualizations.add({
                 return d.depth === 1 ? 2 : 0
             })
             .paddingTop((d) => {
-                // console.log("updateAsync, d.count():", d.count());
                 if (config.showSubHeaders) {
                     return d.depth < number_of_headers ? 16 : 0
                 } else {
@@ -310,6 +310,7 @@ looker.plugins.visualizations.add({
             var root = treemap(
                 d3.hierarchy(nested_data, d => d.values)
                   .sum(d => get_size(d))
+                  .sort(function(a, b) {return b.height - a.height || get_size(b) - get_size(a)})
             );
 
             display_chart(root);
@@ -372,6 +373,7 @@ looker.plugins.visualizations.add({
                     .attr("fill", '#bbbbbb')
                     .attr("class", "foreignobj")
                     .attr("pointer-events", "none")
+                    .attr("white-space", "nowrap")
                   .append("xhtml:div")
                     .html(d => get_cell_text(d))
                     .attr("class", "textdiv"); //textdiv class allows us to style the text easily with CSS
