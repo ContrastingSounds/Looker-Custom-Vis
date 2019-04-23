@@ -1415,7 +1415,7 @@ looker.plugins.visualizations.add({
     // console.log("data", data);
     // console.log("element", element);
     // console.log("config", config);
-    console.log("queryResponse", queryResponse);
+    console.log("queryResponse", JSON.stringify(queryResponse, null, 2));
 
     var vis = this;
     var dimensions = queryResponse.fields.dimension_like
@@ -1431,7 +1431,7 @@ looker.plugins.visualizations.add({
     // UPDATE OPTIONS PANEL
     updateOptionsPanel(vis, dimensions, measures);
 
-    console.log("data", data);
+    console.log("data", JSON.stringify(data, null, 2));
     console.log("config.query_fields.pivots", config.query_fields.pivots);
     console.log("queryResponse.pivots", queryResponse.pivots);
 

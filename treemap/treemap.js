@@ -167,8 +167,10 @@ looker.plugins.visualizations.add({
         console.log("updateAsync() called");
         this.clearErrors();
         this.style.innerHTML = defaultTheme;
-        console.log("data", data);
-        console.log("queryResponse", queryResponse);
+        console.log("#data\n", JSON.stringify(data, null, 2));
+        console.log("#config\n", JSON.stringify(config, null, 2));
+        console.log("#queryResponse\n", JSON.stringify(queryResponse, null, 2));
+
 
         var vis = this;
 
