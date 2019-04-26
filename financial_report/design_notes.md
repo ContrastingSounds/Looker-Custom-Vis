@@ -14,6 +14,13 @@
 
 # Constructing a table
 
+### Variables affecting the vis
+
+- Type of table: pivoted, pivoted with spark lines, or flat?
+- Grouping
+
+### Construction process
+
 1. Reset the viz:
    - Clear errors
    - Destroy the previous tabulator object
@@ -23,16 +30,19 @@
 4. Handle dimensions
    - Add rows to data table
    - Create array of column definitions
-5. Handle measures
+5. Handle pivots
+   - Get the pivot fields and index
+   - Build index for sparklines, if used
+6. Handle measures
    - Add rows to data table: updateDataTableWithMeasureValues()
      - Three types of table: pivoted, pivoted with spark lines, flat
    - Create column definitions
      - Pivot table: buildMeasuresTree()
      - Flat table: buildMeasuresArray() 
    - Append measure columns to dimension columns
-6. Set group_by, if applied in user options
-7. Set sort order _(currently defaulting to first dimension column)_
-8. Construct Tabulator object
+7. Set group_by, if applied in user options
+8. Set sort order _(currently defaulting to first dimension column)_
+9. Construct Tabulator object
 
 ## Tabulator features used
 
@@ -249,9 +259,9 @@ TODO: Probably this can be simplified and the logic just applied inline rather t
 
 _parameters:_ fields, keys, depth
 
-_updates:_ pivot_index 
+_returns:_ spark_index 
 
-Tables with sparklines require a different set of pivot keys, as the final pivot field "disappears" into the array of data points for the sparkline itself. This function enriches the pivot_index with a key value for the new spark_index.
+Tables with sparklines require a different set of pivot keys, as the final pivot field "disappears" into the array of data points for the sparkline itself. This function generates and returns that set of pivot keys as a spark_index.
 
 
 ### updateDataTableWithMeasureValues
