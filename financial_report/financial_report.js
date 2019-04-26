@@ -1560,7 +1560,6 @@ looker.plugins.visualizations.add({
     // UPDATE OPTIONS PANEL
     console.log("updating config...")
     updateOptionsPanel(vis, dimensions, measures);
-    console.log("config.keys()", JSON.stringify(config.keys(), null, 2));    
 
     // HANDLE DIMENSIONS
     console.log("handling dimensions...")
