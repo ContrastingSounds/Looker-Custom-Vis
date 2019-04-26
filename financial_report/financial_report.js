@@ -1525,6 +1525,16 @@ looker.plugins.visualizations.add({
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
     console.log("update function called...");
+    if (debug) {
+      console.log("==== updateAsync arguments ====")
+      console.log("data", JSON.stringify(data, null, 2));
+      console.log("element", JSON.stringify(element, null, 2));
+      console.log("config", JSON.stringify(config, null, 2));
+      console.log("config.keys()", JSON.stringify(config.keys(), null, 2));
+      console.log("queryResponse", JSON.stringify(queryResponse, null, 2));
+      console.log("details", JSON.stringify(details, null, 2));
+    }
+
     // Clear any errors from previous updates.
     this.clearErrors();
     delete this.tabulator_data;
@@ -1536,15 +1546,6 @@ looker.plugins.visualizations.add({
 
     // Set style (this could be made flexible as per https://github.com/looker/custom_visualizations_v2/blob/master/src/examples/subtotal/subtotal.ts)
     this.style.innerHTML = themeFinanceTable
-
-    if (debug) {
-      console.log("==== updateAsync arguments ====")
-      console.log("data", JSON.stringify(data, null, 2));
-      console.log("element", JSON.stringify(element, null, 2));
-      console.log("config", JSON.stringify(config, null, 2));
-      console.log("queryResponse", JSON.stringify(queryResponse, null, 2));
-      console.log("details", JSON.stringify(details, null, 2));
-    }
 
     var vis = this;
     var dimensions = queryResponse.fields.dimension_like
@@ -1560,13 +1561,7 @@ looker.plugins.visualizations.add({
     // UPDATE OPTIONS PANEL
     console.log("updating config...")
     updateOptionsPanel(vis, dimensions, measures);
-
-    if (debug) {
-      console.log("==== updateOptionsPanel ====")
-      console.log("config.query_fields.pivots", JSON.stringify(config.query_fields.pivots, null, 2));  
-      console.log("queryResponse.pivots", JSON.stringify(queryResponse.pivots, null, 2));
-    }
-    
+    console.log("config.keys()", JSON.stringify(config.keys(), null, 2));    
 
     // HANDLE DIMENSIONS
     console.log("handling dimensions...")
@@ -1581,6 +1576,8 @@ looker.plugins.visualizations.add({
 
     // HANDLE PIVOTS
     console.log("handling pivots...")
+
+    // hitting undefined error, does config.query_fields get populated on second pass?
     pivot_fields = config.query_fields.pivots;
     pivot_index = queryResponse.pivots;
     if (config.use_sparklines) {
@@ -1590,7 +1587,9 @@ looker.plugins.visualizations.add({
       console.log("==== handle pivots ====")
       console.log("pivot_fields:", JSON.stringify(pivot_fields, null, 2));
       console.log("pivot_index:", JSON.stringify(pivot_index, null, 2));
-      console.log("spark_index:", JSON.stringify(spark_index, null, 2));
+      if (spark_index != undefined) {
+        console.log("spark_index:", JSON.stringify(spark_index, null, 2));  
+      }
     }
 
     // HANDLE MEASURES
