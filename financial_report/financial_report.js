@@ -7,11 +7,12 @@
  *   render_table and debug are dev-only flags
  */ 
 render_table = true;
-debug = true;
+debug = false;
 debug_spark_index = false;
 debug_measure_tree = false;
 debug_measure_leaves = false;
 debug_data = false;
+debug_rendering = true;
 
 
 /**
@@ -48,11 +49,16 @@ number_formats = {
  * Used by the applyMeasureFormat() function.
  */
 spark_line_config = {
-  width:"100%", 
-  type:"line", 
-  disableTooltips:true, 
-  lineColor:"black", 
-  fillColor:"lightblue"
+  width: "100%", 
+  type: "line", 
+  disableTooltips: true, 
+  lineColor: "black", 
+  fillColor: "lightblue"
+}
+
+spark_bar_config = {
+  width: "100%",
+  type: "bar"
 }
 
 formatters = {
@@ -67,7 +73,7 @@ formatters = {
   },
   "spark_bar": function(cell, formatterParams, onRendered) {
     onRendered(function() {
-      $(cell.getElement()).sparkline(cell.getValue(), {width:"100%", type:"bar"});
+      $(cell.getElement()).sparkline(cell.getValue(), spark_bar_config);
     })
   },
 }
@@ -878,7 +884,7 @@ global_options = {
   use_sparklines: {
     section: "Data",
     type: "boolean",
-    label: "Use Sparklines (requires pivot by date)",
+    label: "Use Sparklines",
     default: "true"
   },
 }
@@ -899,6 +905,10 @@ const getNestedObject = (nestedArray, pathArr) => {
 updateOptionsPanel = function(vis, dimensions, measures) {
   new_options = global_options
   group_by_options = []
+
+  // For each dimension:
+  // Create an invisible config option to store the column width
+  // Add the dimension to the array of group_by options
   dimensions.forEach(function(field) {
     safe_name = field.name.replace(".", "|");
     id = "Width: " + safe_name;
@@ -945,10 +955,12 @@ buildDimensionNamesArray = function(dimensions) {
 }
 
 /**
- * Builds array of Tabulator column definitions for all the dimensions
+ * Builds array of Tabulator column definitions for all the dimensions (the left side of table)
+ * 
  * Maybe due to not being familiar with Javascript, but had some odd behaviour when trying to
  * refer to fields using dotted notation, so using "safe names" where all periods replaced with pipes
- * Note: dimensions use the label_short property for their names, table calcs use the label property
+ *
+ * Note: dimensions use the 'label_short' property for their names, table calcs use the 'label' property
  */
 buildDimensionDefinitions = function(dimensions, config) {
   dim_details = []
@@ -965,8 +977,8 @@ buildDimensionDefinitions = function(dimensions, config) {
         // frozen: true,
       }
 
-      if (config["Width: " + safe_name] != null) {
-        dim_definition["width"] = config["Width: " + safe_name]
+      if (config["Width: " + dim_definition["field"]] != null) {
+        dim_definition["width"] = config["Width: " + dim_definition["field"]];
       }
       dim_details.push(dim_definition)
   }
@@ -974,7 +986,8 @@ buildDimensionDefinitions = function(dimensions, config) {
 }
 
 /**
- * Builds the data set as an array of rows, populated with the dimension fields
+ * First pass of building the data set for Tabulator as an array of rows. This is done in multiple passes.
+ * The first pass is populated with just the dimension fields.
  * This will later be enriched with measures and supermeasures.
  */
 buildTableSpine = function(data, dim_names) {
@@ -1009,7 +1022,6 @@ insertColumnGroup = function(group, branch, index, iteration=1) {
   }
 
   if (iteration == index.length) {
-    // insert_point = index[index.length - 1];
     branch.columns.push(group);
 
   } else {
@@ -1023,7 +1035,7 @@ insertColumnGroup = function(group, branch, index, iteration=1) {
  * Adds an array of measures as leaves on the Measures Tree (using Tabulator column definitions)
  * Recursive in order to support trees/pivots of arbitrary depth
  *
- * measures_array: Array of definitions for Tabulator (alignment, bottomCalc, formatter, etc)
+ * measures_array: Array of Tabulator column definitions
  * branch: Tree structure of column headings, as deep as the number of pivots
  *         During recursion, the sub_branch is used to track the recursion
  * index: The "address" at which the leaves will be added to the Measures Tree
@@ -1042,7 +1054,6 @@ insertMeasuresLeaves = function(measures_array, branch, index, iteration=1) {
     if (debug_measure_leaves) {
       console.log("Inserting Measures Leaves at:", index);      
     }
-    // insert_point = index[index.length - 1];
     branch.columns = measures_array;
   } else {
     branch_index = index[iteration - 1];
@@ -1054,10 +1065,15 @@ insertMeasuresLeaves = function(measures_array, branch, index, iteration=1) {
 /**
  * Given a measure object and association definition, returns an updated measure definition
  * with the appropriate formatter and calculation when grouped.
- * Number formats stored in number_formats object.
+ *
+ * Number formats are defined at the top of the file in the number_formats object.
  * Formatter functions (including spark lines) stored in formatters object.
  */
 applyMeasureFormat = function(mea_object, mea_definition, config) {
+  console.log("================================")
+  console.log("mea_object", JSON.stringify(mea_object, null, 2));
+  console.log("mea_definition", JSON.stringify(mea_definition, null, 2));
+  // Sparkline columns do not support top or bottom calculations
   if (!config.use_sparklines) {
     if (["sum", "count", "count_distinct"].includes(mea_object.type)) {
       mea_definition["bottomCalc"] = "sum";
@@ -1099,8 +1115,8 @@ applyMeasureFormat = function(mea_object, mea_definition, config) {
     }
   }
 
-  if (config["Width: " + safe_name] != null) {
-    mea_definition["width"] = config["Width: " + safe_name]
+  if (config["Width: " + mea_definition["field"]] != null) {
+    mea_definition["width"] = config["Width: " + mea_definition["field"]]
   }
 
   return mea_definition
@@ -1126,12 +1142,12 @@ applyMeasureFormat = function(mea_object, mea_definition, config) {
  * metrics: array of measure field definitions (one field/definition per measure)
  * vis_config: the main config object 
  */
-buildMeasuresTree = function(fields, keys, metrics, vis_config) {
+buildMeasuresHeadersTree = function(fields, keys, metrics, vis_config) {
   if (debug_measure_tree) {
-    console.log("===== calling buildMeasuresTree() with... =====");
-    console.log("buildMeasuresTree: fields:", JSON.stringify(fields, null, 2));
-    console.log("buildMeasuresTree: keys:", JSON.stringify(keys, null, 2));
-    console.log("buildMeasuresTree: metrics:", JSON.stringify(metrics, null, 2));    
+    console.log("===== calling buildMeasuresHeadersTree() with... =====");
+    console.log("buildMeasuresHeadersTree: fields:", JSON.stringify(fields, null, 2));
+    console.log("buildMeasuresHeadersTree: keys:", JSON.stringify(keys, null, 2));
+    console.log("buildMeasuresHeadersTree: metrics:", JSON.stringify(metrics, null, 2));    
   }
 
   // Initialise tree
@@ -1143,8 +1159,8 @@ buildMeasuresTree = function(fields, keys, metrics, vis_config) {
   ];
 
   // depth: number of pivot fields to use (depends on whether sparklines are on)
-  // branch_addr: array indices so that columns and groups can be added at right place
-  // latest_branch_value: most recent values seen for the pivot fields
+  // branch_addr: location in the tree structure so that columns and groups can be added at right place
+  // latest_branch_value: most recent set of values seen for the pivot fields
   if (vis_config.use_sparklines) {
     depth = fields.length - 1
   } else {
@@ -1159,7 +1175,7 @@ buildMeasuresTree = function(fields, keys, metrics, vis_config) {
   }
 
   if (debug_measure_tree) {
-    console.log("===== buildMeasuresTree() main loop about to start... =====");
+    console.log("===== buildMeasuresHeadersTree() main loop about to start... =====");
     console.log("depth:", JSON.stringify(depth, null, 2));
     console.log("keys.length:", JSON.stringify(keys.length, null, 2));
     console.log("vis_config.use_sparklines:", JSON.stringify(vis_config.use_sparklines, null, 2));
@@ -1205,7 +1221,7 @@ buildMeasuresTree = function(fields, keys, metrics, vis_config) {
           latest_branch_value[level] = current_node_value;
 
           if (debug_measure_tree) {
-            console.log("buildMeasuresTree() setting tree_index");  
+            console.log("buildMeasuresHeadersTree() setting tree_index");  
           }
           tree_index = branch_addr.slice(0, level + 1);
           new_column_group = {
@@ -1228,13 +1244,11 @@ buildMeasuresTree = function(fields, keys, metrics, vis_config) {
       for (metric = 0; metric < metrics.length; metric++) {
         looker_definition = metrics[metric];
 
-        // TODO: WHAT SHOULD BE THE FIRST RIGHT HAND VALUE HERE?
         if (vis_config.use_sparklines && depth == 0) {
           safe_name = looker_definition.name.replace(".", "|");  
         } else {
           safe_name = branch_key + '|' + looker_definition.name.replace(".", "|");
         }
-        
 
         if (metrics[metric].hasOwnProperty("label_short")) {
           metric_title = looker_definition.label_short
@@ -1253,7 +1267,6 @@ buildMeasuresTree = function(fields, keys, metrics, vis_config) {
       if (debug_measure_tree) {
         console.log("calling insertMeasuresLeaves with...");
         console.log("leaves:", JSON.stringify(leaves, null, 2));
-        // console.log("tree[0]:", JSON.stringify(tree[0], null, 2));
         console.log("tree_index:", JSON.stringify(tree_index, null, 2));
       }
       insertMeasuresLeaves(leaves, tree[0], tree_index) ;
@@ -1275,10 +1288,10 @@ buildMeasureNames = function(measures) {
 }
 
 /**
- * For 'flat' non-pivoted tables, builds simple array of measures (as Tabulator column definitions)
+ * For 'flat' non-pivoted tables, builds simple array of Tabulator column definitions for measure headers
  * This array will be concatenated to the existing array of dimension columns
  */
-buildMeasuresFlat = function(measures, config) {
+buildMeasuresHeadersFlat = function(measures, config) {
   var mea_names = []
   var mea_details = []
   
@@ -1308,26 +1321,13 @@ buildMeasuresFlat = function(measures, config) {
   return mea_details
 }
 
-// TODO: change/rename current getSparklinePivotIndex to getSparklineFieldName
-/**
- * Constructs a new column reference for pivoted tables with a sparkline
- * This requires all but the last pivot field.
- * TODO: this should probably be done with a .join() method, and probably just inline
- */
-// getSparklinePivotIndex = function(fields, keys, key) {
-//   var new_name = keys[key].data[fields[0].name];
-//   var depth = fields.length - 1;
-//   for (i = 1; i < depth; i++) {
-//     new_name += '|' + keys[key].data[fields[i].name];
-//   }
-//   return new_name
-// }
+
 
 /**
- * For every pivot key, enrich the original key with a new spark_key.
+ * For every pivot key, enriches the original key with a new spark_key.
  * The spark_key consists of all but the last pivot field.
  *
- * Also construct a spark_index of unique spark_keys for later iteration.
+ * Also constructs a spark_index of unique spark_keys for later iteration.
  * This is done by simply pushing the entire pivot_key into the spark_key
  * array whenever a new spark_key value is encountered.
  */
@@ -1370,9 +1370,9 @@ buildSparklinePivotIndex = function(fields, keys) {
  * appropriate field name. The correct value and field depends on whether pivots and spark
  * lines are to be used.
  *
- * data_in: data from Looker
- * data_out: data for Tabulator, passed in at this stage with only the dimension values
- * fields: pivot fields
+ * data_in: data object from Looker
+ * data_out: data object for Tabulator, passed in at this stage with only the dimension values
+ * fields: pivot fields (ie the dimension names)
  * keys: pivot field values
  * metrics: Looker measures
  * vis_config: main vis object
@@ -1418,9 +1418,9 @@ updateDataTableWithMeasureValues = function(data_in, data_out, fields, keys, met
                 if (spark_key_value != null && spark_data_points) {
                   var field_name = spark_key_value + '|' + safe_name
                   data_out[row][field_name] = spark_data_points;
-                  
+      
                   if (debug_data) {
-                    console.log("FLUSH VALUES: ", field_name, spark_data_points)
+                    console.log("Flush values due to change in key value: ", field_name, spark_data_points)
                   }
                 }
 
@@ -1448,6 +1448,10 @@ updateDataTableWithMeasureValues = function(data_in, data_out, fields, keys, met
                     } else {
                       field_name = spark_key_value + '|' + safe_name
                       data_out[row][field_name] = spark_data_points
+
+                      if (debug_data) {
+                        console.log("Flush values due to reaching final key: ", field_name, spark_data_points)
+                      }
                     }
                   }
                 }
@@ -1495,20 +1499,22 @@ updateDataTableWithMeasureValues = function(data_in, data_out, fields, keys, met
  * Finance Table Vis:
  *  1. Clear errors, the old vis, the data table
  *  2. Set style
- *  3. Validate config. May restrict the depth of pivots allowed based on behaviour seen so far.
- *  4. Handle dimensions
+ *  3. (TBD) Validate config. May restrict the depth of pivots allowed based on behaviour seen so far.
+ *  4. Update config panel
+ *  5. Handle dimensions
  *     - Add rows to data table
  *     - Create array of column definitions
- *  5. Handle measures
+ *  6. Handle pivots
+ *  7. Handle measures
  *     - Add rows to data table: updateDataTableWithMeasureValues()
  *       - Three variations: pivoted, pivoted with spark lines, flat
  *     - Create column definitions
- *       - Pivot table: buildMeasuresTree()
+ *       - Pivot table: buildMeasuresHeadersTree()
  *       - Flat table: buildMeasuresArray() 
  *     - Append measure columns to dimenion columns
- *  6. Set group_by, if set in user config
- *  7. Set sort order (currently defaulting to first dimension column)
- *  8. Render Tabulator table
+ *  8. Set group_by, if set in user config
+ *  9. Set sort order (currently defaulting to first dimension column)
+ *  10. Render Tabulator table
  */
 looker.plugins.visualizations.add({
   options: global_options,
@@ -1559,7 +1565,13 @@ looker.plugins.visualizations.add({
 
     // UPDATE OPTIONS PANEL
     console.log("updating config...")
+    if (debug_rendering) {
+      console.log("BEFORE========");
+    }
     updateOptionsPanel(vis, dimensions, measures);
+    if (debug_rendering) {
+      console.log("AFTER=========");
+    }
 
     // HANDLE DIMENSIONS
     console.log("handling dimensions...")
@@ -1609,19 +1621,17 @@ looker.plugins.visualizations.add({
       } else {
         branch_index = pivot_index
       }
-      mea_details = buildMeasuresTree(pivot_fields, branch_index, measures, config)
+      mea_details = buildMeasuresHeadersTree(pivot_fields, branch_index, measures, config)
     } else {
-      mea_details = buildMeasuresFlat(measures, config);
+      mea_details = buildMeasuresHeadersFlat(measures, config);
+    }
+    if (debug_rendering) {
+      console.log("mea_details:", JSON.stringify(mea_details, null, 2));
     }
     table_col_details = dim_details.concat(mea_details) 
 
-    // DEBUG CHECK
-    if (debug) {
-      console.log("==== tabulator columns and data ====")
-      console.log("table_col_details:", JSON.stringify(table_col_details, null, 2));
-      console.log("tabulator_data:", JSON.stringify(tabulator_data, null, 2));
-    }
 
+    // SET GROUPING AND SORTING
     if (config.use_grouping == true) {
         group_by = config.group_by
     } else {
@@ -1630,31 +1640,48 @@ looker.plugins.visualizations.add({
 
     initial_sort = table_col_details[0].field;
 
+    // DEBUG CHECK
+    if (debug) {
+      console.log("==== tabulator columns and data ====")
+      console.log("table_col_details:", JSON.stringify(table_col_details, null, 2));
+      console.log("tabulator_data:", JSON.stringify(tabulator_data, null, 2));
+    }
+
+    if (debug_rendering) {
+      console.log("table_col_details:", JSON.stringify(table_col_details, null, 2));
+      console.log("group_by:", JSON.stringify(group_by, null, 2));
+      console.log("initial_sort:", JSON.stringify(initial_sort, null, 2));          
+    }
+
     if (render_table) {
       console.log("rendering table...")
       var tbl = $("#finance_tabulator").tabulator({
         virtualDom: false,
-        data: tabulator_data,           //load row data from array
+        data: tabulator_data,
         // layout:"fitDataFill",      // fit columns to data, but also fill full table width
-        layout:"fitDataFill",
+        layout: "fitDataFill",
         // responsiveLayout: "hide",  //hide columns that dont fit on the table
         
-        tooltips: true,            //show tool tips on cells
+        tooltips: true,
         
-        pagination: false, //"local",       //paginate the data
-        paginationSize: 10,         //allow 7 rows per page of data
+        pagination: false, 
+        // paginationSize: 10,         //allow 7 rows per page of data
         
         // persistentLayout:true,   // fails due to sandboxing
-        movableColumns: true,      //allow column order to be changed
-        resizableColumns: false,
-        resizableRows: false,       //allow row size to be changed
+        movableColumns: true,
+        resizableColumns: true,
+        resizableRows: false,
         
         groupBy: group_by,
         groupHeader: function(value, count, data, group) {
-            //value - the value all members of this group share
-            //count - the number of rows in this group
-            //data - an array of all the row data objects in this group
-            //group - the group component for the group
+            // value - the value all members of this group share
+            // count - the number of rows in this group
+            // data - an array of all the row data objects in this group
+            // group - the group component for the group
+
+          if (debug_rendering) {
+            console.log("groupHeader(value, count, data, group)")            
+          }
 
             return value + "<span style='color:#d00; margin-left:10px;'>(" + count + " item)</span>";
         },
@@ -1663,11 +1690,11 @@ looker.plugins.visualizations.add({
         columns: table_col_details,
 
         columnMoved: function(column, columns){
-        //column - column component of the moved column
-        //columns- array of columns in new order
+          // column - column component of the moved column
+          // columns - array of columns in new order
           // https://github.com/olifolkerd/tabulator/issues/362
           var columnLayouts = $("#finance_tabulator").tabulator("getColumnLayout");
-          if (debug) {
+          if (debug_rendering) {
             console.log("columnMoved() event")
             console.log("columnLayouts", columnLayouts);
             console.log(JSON.stringify(columnLayouts, null, 2));            
@@ -1681,8 +1708,11 @@ looker.plugins.visualizations.add({
         },
 
         tooltips: function(cell) {
-            //function should return a string for the tooltip or false to hide the tooltip
-            return  cell.getColumn().getDefinition().title + ": " + cell.getValue(); 
+          if (debug_rendering) {
+            console.log("tooltips(cell)")
+          }
+          //function should return a string for the tooltip or false to hide the tooltip
+          return  cell.getColumn().getDefinition().title + ": " + cell.getValue(); 
         },
       });
     } else {
