@@ -1070,9 +1070,6 @@ insertMeasuresLeaves = function(measures_array, branch, index, iteration=1) {
  * Formatter functions (including spark lines) stored in formatters object.
  */
 applyMeasureFormat = function(mea_object, mea_definition, config) {
-  console.log("================================")
-  console.log("mea_object", JSON.stringify(mea_object, null, 2));
-  console.log("mea_definition", JSON.stringify(mea_definition, null, 2));
   // Sparkline columns do not support top or bottom calculations
   if (!config.use_sparklines) {
     if (["sum", "count", "count_distinct"].includes(mea_object.type)) {
@@ -1624,9 +1621,6 @@ looker.plugins.visualizations.add({
       mea_details = buildMeasuresHeadersTree(pivot_fields, branch_index, measures, config)
     } else {
       mea_details = buildMeasuresHeadersFlat(measures, config);
-    }
-    if (debug_rendering) {
-      console.log("mea_details:", JSON.stringify(mea_details, null, 2));
     }
     table_col_details = dim_details.concat(mea_details) 
 
