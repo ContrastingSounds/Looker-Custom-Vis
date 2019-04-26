@@ -1639,7 +1639,7 @@ looker.plugins.visualizations.add({
         virtualDom: false,
         data: tabulator_data,           //load row data from array
         // layout:"fitDataFill",      // fit columns to data, but also fill full table width
-        layout:"fitData",
+        layout:"fitDataFill",
         // responsiveLayout: "hide",  //hide columns that dont fit on the table
         
         tooltips: true,            //show tool tips on cells
