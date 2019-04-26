@@ -1530,7 +1530,6 @@ looker.plugins.visualizations.add({
       console.log("data", JSON.stringify(data, null, 2));
       console.log("element", JSON.stringify(element, null, 2));
       console.log("config", JSON.stringify(config, null, 2));
-      console.log("config.keys()", JSON.stringify(config.keys(), null, 2));
       console.log("queryResponse", JSON.stringify(queryResponse, null, 2));
       console.log("details", JSON.stringify(details, null, 2));
     }
