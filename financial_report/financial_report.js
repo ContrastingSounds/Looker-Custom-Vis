@@ -7,10 +7,11 @@
  *   render_table and debug are dev-only flags
  */ 
 render_table = true;
-debug = false;
+debug = true;
 debug_spark_index = false;
 debug_measure_tree = false;
-debug_data = true;
+debug_measure_leaves = false;
+debug_data = false;
 
 
 /**
@@ -51,7 +52,7 @@ spark_line_config = {
   type:"line", 
   disableTooltips:true, 
   lineColor:"black", 
-  fillColor:"lightgrey"
+  fillColor:"lightblue"
 }
 
 formatters = {
@@ -1030,7 +1031,7 @@ insertColumnGroup = function(group, branch, index, iteration=1) {
  *            index.length will be equal to number of pivots for sparklines, plus one for non-sparklines
  */
 insertMeasuresLeaves = function(measures_array, branch, index, iteration=1) {
-  if (debug) {
+  if (debug_measure_leaves) {
     console.log("insertMeasuresLeaves, depth:", JSON.stringify(iteration, null, 2));
     console.log("--measures_array:", JSON.stringify(measures_array, null, 2));
     console.log("--branch:", JSON.stringify(branch, null, 2));
@@ -1038,7 +1039,7 @@ insertMeasuresLeaves = function(measures_array, branch, index, iteration=1) {
   }
 
   if (iteration == index.length) {
-    if (debug) {
+    if (debug_measure_leaves) {
       console.log("Inserting Measures Leaves at:", index);      
     }
     // insert_point = index[index.length - 1];
@@ -1057,11 +1058,13 @@ insertMeasuresLeaves = function(measures_array, branch, index, iteration=1) {
  * Formatter functions (including spark lines) stored in formatters object.
  */
 applyMeasureFormat = function(mea_object, mea_definition, config) {
-  if (["sum", "count", "count_distinct"].includes(mea_object.type)) {
-    mea_definition["bottomCalc"] = "sum";
-  }
-  else if (["average", "average_distinct"].includes(mea_object.type)) {
-    mea_definition["bottomCalc"] = "avg";
+  if (!config.use_sparklines) {
+    if (["sum", "count", "count_distinct"].includes(mea_object.type)) {
+      mea_definition["bottomCalc"] = "sum";
+    }
+    else if (["average", "average_distinct"].includes(mea_object.type)) {
+      mea_definition["bottomCalc"] = "avg";
+    }
   }
 
   if (config.use_sparklines) {
@@ -1434,8 +1437,18 @@ updateDataTableWithMeasureValues = function(data_in, data_out, fields, keys, met
                   var data_value = data_in[row][raw_name][key_value].value;
                   spark_data_points.push(data_value);
                   // if there's only a single pivot field, flush at end of row
-                  if (fields.length == 1 && key + 1 == keys.length) {
-                    data_out[row][safe_name] = spark_data_points
+                  if (debug_data) {
+                    console.log("spark_data_points", spark_key_value, spark_data_points);
+                    console.log("key", key+1, keys.length);
+                  }
+                  // if (fields.length == 1 && key + 1 == keys.length) {
+                  if (key + 1 == keys.length) {
+                    if (fields.length == 1) {
+                      data_out[row][safe_name] = spark_data_points
+                    } else {
+                      field_name = spark_key_value + '|' + safe_name
+                      data_out[row][field_name] = spark_data_points
+                    }
                   }
                 }
               }  
@@ -1625,7 +1638,8 @@ looker.plugins.visualizations.add({
       var tbl = $("#finance_tabulator").tabulator({
         virtualDom: false,
         data: tabulator_data,           //load row data from array
-        layout:"fitDataFill",      // fit columns to data, but also fill full table width
+        // layout:"fitDataFill",      // fit columns to data, but also fill full table width
+        layout:"fitData",
         // responsiveLayout: "hide",  //hide columns that dont fit on the table
         
         tooltips: true,            //show tool tips on cells
@@ -1635,7 +1649,7 @@ looker.plugins.visualizations.add({
         
         // persistentLayout:true,   // fails due to sandboxing
         movableColumns: true,      //allow column order to be changed
-        resizableColumns: true,
+        resizableColumns: false,
         resizableRows: false,       //allow row size to be changed
         
         groupBy: group_by,
