@@ -892,7 +892,9 @@ checkResponseForErrors = function(config, queryResponse, details) {
     console.log("# Dimensions:    ", queryResponse.fields.dimensions.length);
     console.log("# Measures:      ", queryResponse.fields.measures.length);
     console.log("# Pivots:        ", queryResponse.fields.pivots.length);
-    console.log("# Supermeasures: ", queryResponse.fields.supermeasure_like.length);
+    if (typeof queryResponse.fields.supermeasure_like !== 'undefined') {
+      console.log("# Supermeasures: ", queryResponse.fields.supermeasure_like.length);
+    }
     console.log();
 
     if (queryResponse.fields.dimensions.length > 0) {
@@ -922,7 +924,9 @@ checkResponseForErrors = function(config, queryResponse, details) {
       console.log("Pivots: ", pivots_list); 
     }
 
-    if (queryResponse.fields.supermeasure_like.length > 0) {
+    if (typeof queryResponse.fields.supermeasure_like !== 'undefined'
+        && queryResponse.fields.supermeasure_like.length > 0) 
+    {
       supermeasure_names = [];
       for (var i = 0; i < queryResponse.fields.supermeasure_like.length; i++) {
         supermeasure_names.push(queryResponse.fields.supermeasure_like[i].label)
@@ -938,18 +942,25 @@ checkResponseForErrors = function(config, queryResponse, details) {
 
   error_string = "";
 
-  // PIVOTS?
+  // PIVOTS FOR SPARKLINES?
   if (config.use_sparklines && queryResponse.fields.pivots.length == 0) {
     error_string = error_string.concat("Pivot is required for sparklines. ")
   } 
 
   // ROW TOTALS?
-  if (queryResponse.has_row_totals) {
+  if (queryResponse.has_row_totals && 1==2) {
     error_string = error_string.concat("Row totals are not supported. ")
   }
 
   // SUPERMEASURES?
-  if (queryResponse.fields.supermeasure_like.length > 0) {
+  if (typeof queryResponse.fields.supermeasure_like !== 'undefined'
+      && queryResponse.fields.supermeasure_like.length > 0 ) 
+  {
+    supermeasure_names = [];
+    for (var i = 0; i < queryResponse.fields.supermeasure_like.length; i++) {
+      supermeasure_names.push(queryResponse.fields.supermeasure_like[i].label)
+    }
+    supermeasures_list = supermeasure_names.join();
     error_string = error_string.concat(["Non-pivoting table calcs (", supermeasures_list, ") not supported. "].join(""));
   }
 
@@ -1156,7 +1167,7 @@ applyMeasureFormat = function(mea_object, mea_definition, config) {
     }
   }
 
-  if (config.use_sparklines) {
+  if (config.use_sparklines && config.query_fields.pivots.length > 0) {
     mea_definition["formatter"] = formatters["spark_line"]; 
   } else if (mea_object.value_format != null) {        
     if (mea_object.value_format.indexOf("$") !== -1) {
@@ -1364,31 +1375,35 @@ buildMeasureNames = function(measures) {
  * For 'flat' non-pivoted tables, builds simple array of Tabulator column definitions for measure headers
  * This array will be concatenated to the existing array of dimension columns
  */
-buildMeasuresHeadersFlat = function(measures, config) {
+buildMeasuresHeadersFlat = function(measures, config, row_totals_only=false) {
   var mea_names = []
   var mea_details = []
   
   for (var i = 0; i < measures.length; i++) {
-    var mea_name = measures[i].name
-    mea_names.push(mea_name)
-    
-    var safe_name = mea_name.replace(".", "|")
-    var looker_definition = measures[i]
-
-    if (looker_definition.hasOwnProperty("label_short")) {
-      measure_title = looker_definition.label_short
+    if (row_totals_only && measures[i].hasOwnProperty("can_pivot")) {
+      // do nothing
     } else {
-      measure_title = looker_definition.label
-    }
+      var mea_name = measures[i].name
+      mea_names.push(mea_name)
+      
+      var safe_name = mea_name.replace(".", "|")
+      var looker_definition = measures[i]
 
-    tabulator_definition = {
-      title: measure_title,
-      field: safe_name,
-      align: looker_definition.align,
-    }
+      if (looker_definition.hasOwnProperty("label_short")) {
+        measure_title = looker_definition.label_short
+      } else {
+        measure_title = looker_definition.label
+      }
 
-    tabulator_definition = applyMeasureFormat(looker_definition, tabulator_definition, config);
-    mea_details.push(tabulator_definition)
+      tabulator_definition = {
+        title: measure_title,
+        field: safe_name,
+        align: looker_definition.align,
+      }
+
+      tabulator_definition = applyMeasureFormat(looker_definition, tabulator_definition, config);
+      mea_details.push(tabulator_definition)      
+    }
   }
 
   return mea_details
@@ -1505,6 +1520,7 @@ updateDataTableWithMeasureValues = function(data_in, data_out, fields, keys, met
                 if (typeof data_in[row][raw_name][key_value] !== 'undefined') {
                   var data_value = data_in[row][raw_name][key_value].value;
                   spark_data_points.push(data_value);
+                  
                   // if there's only a single pivot field, flush at end of row
                   if (debug_data) {
                     console.log("spark_data_points", spark_key_value, spark_data_points);
@@ -1533,7 +1549,16 @@ updateDataTableWithMeasureValues = function(data_in, data_out, fields, keys, met
                 data_out[row][field_name] = data_value; 
               } 
             }
-          } 
+          } else {
+            // if queryResponse.can_pivot = false
+            if (typeof data_in[row][raw_name][key_value] !== 'undefined') {
+              var field_name = key_value + '|' + safe_name //
+              data_value = data_in[row][raw_name][key_value].value // 
+              if (data_value) {
+                data_out[row][field_name] = data_value; 
+              }            
+            }
+          }
         }     
       }
     }
@@ -1649,14 +1674,14 @@ looker.plugins.visualizations.add({
     
     pivot_fields = config.query_fields.pivots;
     pivot_index = queryResponse.pivots;
-    if (config.use_sparklines) {
+    if (config.use_sparklines && queryResponse.fields.pivots.length > 0) {
       spark_index = buildSparklinePivotIndex(pivot_fields, pivot_index)
     }
     if (debug) {
       console.log("==== handle pivots ====")
       console.log("pivot_fields:", JSON.stringify(pivot_fields, null, 2));
       console.log("pivot_index:", JSON.stringify(pivot_index, null, 2));
-      if (config.use_sparklines && spark_index != undefined) {
+      if (config.use_sparklines && typeof spark_index !== 'undefined') {
         console.log("spark_index:", JSON.stringify(spark_index, null, 2));  
       }
     }
@@ -1676,12 +1701,16 @@ looker.plugins.visualizations.add({
       } else {
         branch_index = pivot_index
       }
-      mea_details = buildMeasuresHeadersTree(pivot_fields, branch_index, measures, config)
+      tree_headers = buildMeasuresHeadersTree(pivot_fields, branch_index, measures, config);
+      row_total_headers = buildMeasuresHeadersFlat(measures, config, true);
+      mea_details = tree_headers.concat(row_total_headers);
     } else {
-      mea_details = buildMeasuresHeadersFlat(measures, config);
+      mea_details = buildMeasuresHeadersFlat(measures, config, false);
     }
     table_col_details = dim_details.concat(mea_details) 
 
+
+    // HANDLE SUPERMEASURES
 
     // SET GROUPING AND SORTING
     if (config.use_grouping == true) {
@@ -1697,8 +1726,8 @@ looker.plugins.visualizations.add({
       console.log("==== Tabulator.js columns and data ====")
       console.log("table_col_details:", JSON.stringify(table_col_details, null, 2));
       console.log("tabulator_data:", JSON.stringify(tabulator_data, null, 2));
-      console.log("group_by:", JSON.stringify(tabulator_data, null, 2));
-      console.log("initial_sort:", JSON.stringify(tabulator_data, null, 2));
+      console.log("group_by:", JSON.stringify(group_by, null, 2));
+      console.log("initial_sort:", JSON.stringify(initial_sort, null, 2));
     }
 
     // RENDER VISUALISATION
