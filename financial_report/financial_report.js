@@ -4,18 +4,13 @@
  */
 
 /**
- *   render_table and debug are dev-only flags
+ *   debug flags
  */ 
-render_table = true;
-
 info = true;
 debug = false;
 debug_spark_index = false;
 debug_measure_tree = false;
-debug_measure_leaves = false;
 debug_data = false;
-debug_rendering = false;
-
 
 /**
  * Different Tablulator number formats to set the appearance of measure cells in the table
@@ -950,7 +945,7 @@ checkResponseForErrors = function(config, queryResponse, details) {
 
   // ROW TOTALS?
   if (queryResponse.has_row_totals) {
-    error_string = error_string.concat("Row totals not supported for sparklines. ")
+    error_string = error_string.concat("Row totals are not supported. ")
   }
 
   // SUPERMEASURES?
@@ -974,10 +969,10 @@ checkResponseForErrors = function(config, queryResponse, details) {
  * function to retrieve object from nest of arbitrary depth, using array of indices
  * https://hackernoon.com/accessing-nested-objects-in-javascript-f02f1bd6387f
  */
-const getNestedObject = (nestedArray, pathArr) => {
-    return pathArr.reduce((obj, key) =>
-        (obj && obj[key] !== 'undefined') ? obj[key] : undefined, nestedArray);
-}
+// const getNestedObject = (nestedArray, pathArr) => {
+//     return pathArr.reduce((obj, key) =>
+//         (obj && obj[key] !== 'undefined') ? obj[key] : undefined, nestedArray);
+// }
 
 /**
  * Register new config options (eg settings for individual fields)
@@ -1124,7 +1119,7 @@ insertColumnGroup = function(group, branch, index, iteration=1) {
  *            index.length will be equal to number of pivots for sparklines, plus one for non-sparklines
  */
 insertMeasuresLeaves = function(measures_array, branch, index, iteration=1) {
-  if (debug_measure_leaves) {
+  if (debug_measure_tree) {
     console.log("insertMeasuresLeaves, depth:", JSON.stringify(iteration, null, 2));
     console.log("--measures_array:", JSON.stringify(measures_array, null, 2));
     console.log("--branch:", JSON.stringify(branch, null, 2));
@@ -1132,7 +1127,7 @@ insertMeasuresLeaves = function(measures_array, branch, index, iteration=1) {
   }
 
   if (iteration == index.length) {
-    if (debug_measure_leaves) {
+    if (debug_measure_tree) {
       console.log("Inserting Measures Leaves at:", index);      
     }
     branch.columns = measures_array;
@@ -1457,12 +1452,10 @@ updateDataTableWithMeasureValues = function(data_in, data_out, fields, keys, met
   if (debug_data) {
     console.log("===== updateDataTableWithMeasureValues() called with =====");
     console.log("data_in", JSON.stringify(data_in, null, 2));
-    // console.log("data_out", JSON.stringify(data_out, null, 2));
-    // console.log("fields", JSON.stringify(fields, null, 2));
+    console.log("fields", JSON.stringify(fields, null, 2));
     console.log("keys.length", keys.length);
     console.log("keys", JSON.stringify(keys, null, 2));
     console.log("metrics", JSON.stringify(metrics, null, 2));
-    // console.log("vis_config", JSON.stringify(vis_config, null, 2));
   }
 
   // PIVOT TABLE
@@ -1634,7 +1627,7 @@ looker.plugins.visualizations.add({
       $("#finance_tabulator").tabulator("destroy");
     }
 
-    // Set style (this could be made flexible as per https://github.com/looker/custom_visualizations_v2/blob/master/src/examples/subtotal/subtotal.ts)
+    // Set style
     this.style.innerHTML = themeFinanceTable
 
     var vis = this;
@@ -1643,13 +1636,7 @@ looker.plugins.visualizations.add({
 
     // UPDATE OPTIONS PANEL
     if (info) { console.log("updating config..."); }
-    if (debug_rendering) {
-      console.log("updating config before========");
-    }
     updateOptionsPanel(vis, dimensions, measures);
-    if (debug_rendering) {
-      console.log("updating config after=========");
-    }
 
     // HANDLE DIMENSIONS
     if (info) { console.log("handling dimensions...") }
@@ -1657,15 +1644,9 @@ looker.plugins.visualizations.add({
     var tabulator_data = buildTableSpine(data, dim_names);
     var dim_details = buildDimensionDefinitions(dimensions, config);
 
-    if (debug) {
-      console.log("==== handle dimensions ====")
-      console.log("dim_names:", JSON.stringify(dim_names, null, 2));
-    }
-
     // HANDLE PIVOTS
     if (info) { console.log("handling pivots...") }
     
-    // hitting undefined error, does config.query_fields get populated on second pass?
     pivot_fields = config.query_fields.pivots;
     pivot_index = queryResponse.pivots;
     if (config.use_sparklines) {
@@ -1683,10 +1664,6 @@ looker.plugins.visualizations.add({
     // HANDLE MEASURES
     if (info) { console.log("handling measures...") }
     var mea_names = buildMeasureNames(measures);
-    if (debug) {
-      console.log("==== handle measures ====")
-      console.log("mea_names:", JSON.stringify(mea_names, null, 2));
-    }
 
     if (info) { console.log("converting data to Tabulator format...") }
     tabulator_data = updateDataTableWithMeasureValues(data, tabulator_data, pivot_fields, pivot_index, mea_names, config);
@@ -1715,85 +1692,59 @@ looker.plugins.visualizations.add({
 
     initial_sort = table_col_details[0].field;
 
-    // DEBUG CHECK
+    // CHECK INPUTS TO TABULATOR LIBRARY
     if (debug) {
-      console.log("==== tabulator columns and data ====")
+      console.log("==== Tabulator.js columns and data ====")
       console.log("table_col_details:", JSON.stringify(table_col_details, null, 2));
       console.log("tabulator_data:", JSON.stringify(tabulator_data, null, 2));
+      console.log("group_by:", JSON.stringify(tabulator_data, null, 2));
+      console.log("initial_sort:", JSON.stringify(tabulator_data, null, 2));
     }
 
-    if (debug_rendering) {
-      console.log("table_col_details:", JSON.stringify(table_col_details, null, 2));
-      console.log("group_by:", JSON.stringify(group_by, null, 2));
-      console.log("initial_sort:", JSON.stringify(initial_sort, null, 2));          
-    }
+    // RENDER VISUALISATION
+    console.log("rendering financial_report.js table...")
+    var tbl = $("#finance_tabulator").tabulator({
+      virtualDom: false,
+      data: tabulator_data,
+      layout: "fitDataFill",
+      tooltips: true,
+      pagination: false, 
+      
+      // persistentLayout:true,   // fails due to sandboxing
+      movableColumns: true,
+      resizableColumns: true,
+      resizableRows: false,
+      
+      groupBy: group_by,
+      groupHeader: function(value, count, data, group) {
+          // value - the value all members of this group share
+          // count - the number of rows in this group
+          // data - an array of all the row data objects in this group
+          // group - the group component for the group
+          return value + "<span style='color:#d00; margin-left:10px;'>(" + count + " item)</span>";
+      },
 
-    if (render_table) {
-      console.log("rendering table...")
-      var tbl = $("#finance_tabulator").tabulator({
-        virtualDom: false,
-        data: tabulator_data,
-        // layout:"fitDataFill",      // fit columns to data, but also fill full table width
-        layout: "fitDataFill",
-        // responsiveLayout: "hide",  //hide columns that dont fit on the table
-        
-        tooltips: true,
-        
-        pagination: false, 
-        // paginationSize: 10,         //allow 7 rows per page of data
-        
-        // persistentLayout:true,   // fails due to sandboxing
-        movableColumns: true,
-        resizableColumns: false,
-        resizableRows: false,
-        
-        groupBy: group_by,
-        groupHeader: function(value, count, data, group) {
-            // value - the value all members of this group share
-            // count - the number of rows in this group
-            // data - an array of all the row data objects in this group
-            // group - the group component for the group
+      initialSort: [ {column: initial_sort, dir:"asc"} ],
+      columns: table_col_details,
 
-          if (debug_rendering) {
-            console.log("groupHeader(value, count, data, group)")            
-          }
+      columnMoved: function(column, columns) {
+        // column - column component of the moved column
+        // columns - array of columns in new order
+        // https://github.com/olifolkerd/tabulator/issues/362
+        var columnLayouts = $("#finance_tabulator").tabulator("getColumnLayout");
+      },
 
-            return value + "<span style='color:#d00; margin-left:10px;'>(" + count + " item)</span>";
-        },
+      columnResized: function(column) {
+        col_resize = {};
+        col_resize["Width: " + column.column.definition.field] = column.column.width;
+        vis.trigger('updateConfig', [col_resize]);
+      },
 
-        initialSort: [ {column: initial_sort, dir:"asc"} ],
-        columns: table_col_details,
-
-        columnMoved: function(column, columns){
-          // column - column component of the moved column
-          // columns - array of columns in new order
-          // https://github.com/olifolkerd/tabulator/issues/362
-          var columnLayouts = $("#finance_tabulator").tabulator("getColumnLayout");
-          if (debug_rendering) {
-            console.log("columnMoved() event")
-            console.log("columnLayouts", columnLayouts);
-            console.log(JSON.stringify(columnLayouts, null, 2));            
-          }
-        },
-
-        columnResized: function(column) {
-          col_resize = {};
-          col_resize["Width: " + column.column.definition.field] = column.column.width;
-          vis.trigger('updateConfig', [col_resize]);
-        },
-
-        tooltips: function(cell) {
-          if (debug_rendering) {
-            console.log("tooltips(cell)")
-          }
-          //function should return a string for the tooltip or false to hide the tooltip
-          return  cell.getColumn().getDefinition().title + ": " + cell.getValue(); 
-        },
-      });
-    } else {
-      this._textElement.innerHTML = "Columns: " + table_col_details.length
-    }
-
+      tooltips: function(cell) {
+        //function should return a string for the tooltip or false to hide the tooltip
+        return  cell.getColumn().getDefinition().title + ": " + cell.getValue(); 
+      },
+    });
 
     // Always call done to indicate a visualization has finished rendering.
     done()
