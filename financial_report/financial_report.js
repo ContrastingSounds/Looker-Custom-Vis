@@ -7,12 +7,14 @@
  *   render_table and debug are dev-only flags
  */ 
 render_table = true;
+
+info = true;
 debug = false;
 debug_spark_index = false;
 debug_measure_tree = false;
 debug_measure_leaves = false;
 debug_data = false;
-debug_rendering = true;
+debug_rendering = false;
 
 
 /**
@@ -889,6 +891,85 @@ global_options = {
   },
 }
 
+
+checkResponseForErrors = function(config, queryResponse, details) {
+  if (info) {
+    console.log("# Dimensions:    ", queryResponse.fields.dimensions.length);
+    console.log("# Measures:      ", queryResponse.fields.measures.length);
+    console.log("# Pivots:        ", queryResponse.fields.pivots.length);
+    console.log("# Supermeasures: ", queryResponse.fields.supermeasure_like.length);
+    console.log();
+
+    if (queryResponse.fields.dimensions.length > 0) {
+      dimension_names = [];
+      for (var i = 0; i < queryResponse.fields.dimensions.length; i++) {
+        dimension_names.push(queryResponse.fields.dimensions[i].label_short)
+      }
+      dimensions_list = dimension_names.join();
+      console.log("Dimensions: ", dimensions_list); 
+    }
+
+    if (queryResponse.fields.measures.length > 0) {
+      measure_names = [];
+      for (var i = 0; i < queryResponse.fields.measures.length; i++) {
+        measure_names.push(queryResponse.fields.measures[i].label_short)
+      }
+      measures_list = measure_names.join();
+      console.log("Measures: ", measures_list); 
+    }
+
+    if (queryResponse.fields.pivots.length > 0) {
+      pivot_names = [];
+      for (var i = 0; i < queryResponse.fields.pivots.length; i++) {
+        pivot_names.push(queryResponse.fields.pivots[i].label_short)
+      }
+      pivots_list = pivot_names.join();
+      console.log("Pivots: ", pivots_list); 
+    }
+
+    if (queryResponse.fields.supermeasure_like.length > 0) {
+      supermeasure_names = [];
+      for (var i = 0; i < queryResponse.fields.supermeasure_like.length; i++) {
+        supermeasure_names.push(queryResponse.fields.supermeasure_like[i].label)
+      }
+      supermeasures_list = supermeasure_names.join();
+      console.log("Supermeasures: ", supermeasures_list); 
+    }
+
+    console.log("Row Totals? ", queryResponse.has_row_totals);
+    console.log("Totals? ", queryResponse.has_totals);
+    console.log("Details: ", JSON.stringify(details, null, 2));    
+  }
+
+  error_string = "";
+
+  // PIVOTS?
+  if (config.use_sparklines && queryResponse.fields.pivots.length == 0) {
+    error_string = error_string.concat("Pivot is required for sparklines. ")
+  } 
+
+  // ROW TOTALS?
+  if (queryResponse.has_row_totals) {
+    error_string = error_string.concat("Row totals not supported for sparklines. ")
+  }
+
+  // SUPERMEASURES?
+  if (queryResponse.fields.supermeasure_like.length > 0) {
+    error_string = error_string.concat(["Non-pivoting table calcs (", supermeasures_list, ") not supported. "].join(""));
+  }
+
+  // CONSTRUCT ERROR MESSAGE
+  if (error_string.length > 0) {
+    errorMessage = {
+      title: "Sparklines table does not support this configuration", 
+      message: error_string
+    }
+    return errorMessage;
+  } else {
+    return null;
+  }
+}
+
 /** 
  * function to retrieve object from nest of arbitrary depth, using array of indices
  * https://hackernoon.com/accessing-nested-objects-in-javascript-f02f1bd6387f
@@ -1014,7 +1095,7 @@ buildTableSpine = function(data, dim_names) {
  * Don't think there's another way – this allows trees of arbitrary depth
  */
 insertColumnGroup = function(group, branch, index, iteration=1) {
-  if (debug) {
+  if (debug_measure_tree) {
     console.log("insertColumnGroup, depth:", iteration);
     console.log("--group:", group);
     console.log("--branch:", branch);
@@ -1102,7 +1183,7 @@ applyMeasureFormat = function(mea_object, mea_definition, config) {
       mea_definition["formatter"] = "money"
       mea_definition["bottomCalcFormatter"] = "money"
       mea_definition["formatterParams"] = number_formats["dec_2"]
-      mea_definition["bottomCalcFormatterParams"] = fornumber_formatsmats["dec_2"]
+      mea_definition["bottomCalcFormatterParams"] = number_formats["dec_2"]
     }
     else {
       mea_definition["formatter"] = "money"
@@ -1318,8 +1399,6 @@ buildMeasuresHeadersFlat = function(measures, config) {
   return mea_details
 }
 
-
-
 /**
  * For every pivot key, enriches the original key with a new spark_key.
  * The spark_key consists of all but the last pivot field.
@@ -1517,17 +1596,24 @@ looker.plugins.visualizations.add({
   options: global_options,
 
   create: function(element, config) {
-    console.log("create function called...");
+    console.log("financial_report.js create() called...");
+
     this.style = document.createElement('style')
     document.head.appendChild(this.style)
 
     var container = element.appendChild(document.createElement("div"));
     container.id = "finance_tabulator";
+
     this._textElement = container.appendChild(document.createElement("div"));
   },
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
-    console.log("update function called...");
+    console.log("financial_report.js updateAsyc() called...");
+
+    // Clear any errors and data from previous updates.
+    this.clearErrors();
+    delete this.tabulator_data;
+
     if (debug) {
       console.log("==== updateAsync arguments ====")
       console.log("data", JSON.stringify(data, null, 2));
@@ -1537,13 +1623,15 @@ looker.plugins.visualizations.add({
       console.log("details", JSON.stringify(details, null, 2));
     }
 
-    // Clear any errors from previous updates.
-    this.clearErrors();
-    delete this.tabulator_data;
+    // Throw some errors and exit if the shape of the data isn't what this chart needs.
+    errors = checkResponseForErrors(config, queryResponse);
+    if (errors) {
+      this.addError(errors);
+    }
 
     // destory old viz if already exists
     if ($("#finance_tabulator").hasClass("tabulator")) { 
-      $("#finance_tabulator").tabulator("destroy") 
+      $("#finance_tabulator").tabulator("destroy");
     }
 
     // Set style (this could be made flexible as per https://github.com/looker/custom_visualizations_v2/blob/master/src/examples/subtotal/subtotal.ts)
@@ -1553,25 +1641,18 @@ looker.plugins.visualizations.add({
     var dimensions = queryResponse.fields.dimension_like
     var measures = queryResponse.fields.measure_like
 
-    // Throw some errors and exit if the shape of the data isn't what this chart needs.
-    // TODO: figure out the necessary error conditions and update as necessary
-    if (dimensions.length == 0) {
-      this.addError({title: "No Dimensions", message: "This chart requires dimensions."});
-      return;
-    }
-
     // UPDATE OPTIONS PANEL
-    console.log("updating config...")
+    if (info) { console.log("updating config..."); }
     if (debug_rendering) {
-      console.log("BEFORE========");
+      console.log("updating config before========");
     }
     updateOptionsPanel(vis, dimensions, measures);
     if (debug_rendering) {
-      console.log("AFTER=========");
+      console.log("updating config after=========");
     }
 
     // HANDLE DIMENSIONS
-    console.log("handling dimensions...")
+    if (info) { console.log("handling dimensions...") }
     var dim_names = buildDimensionNamesArray(dimensions);
     var tabulator_data = buildTableSpine(data, dim_names);
     var dim_details = buildDimensionDefinitions(dimensions, config);
@@ -1582,8 +1663,8 @@ looker.plugins.visualizations.add({
     }
 
     // HANDLE PIVOTS
-    console.log("handling pivots...")
-
+    if (info) { console.log("handling pivots...") }
+    
     // hitting undefined error, does config.query_fields get populated on second pass?
     pivot_fields = config.query_fields.pivots;
     pivot_index = queryResponse.pivots;
@@ -1594,24 +1675,24 @@ looker.plugins.visualizations.add({
       console.log("==== handle pivots ====")
       console.log("pivot_fields:", JSON.stringify(pivot_fields, null, 2));
       console.log("pivot_index:", JSON.stringify(pivot_index, null, 2));
-      if (spark_index != undefined) {
+      if (config.use_sparklines && spark_index != undefined) {
         console.log("spark_index:", JSON.stringify(spark_index, null, 2));  
       }
     }
 
     // HANDLE MEASURES
-    console.log("handling measures...")
+    if (info) { console.log("handling measures...") }
     var mea_names = buildMeasureNames(measures);
     if (debug) {
       console.log("==== handle measures ====")
       console.log("mea_names:", JSON.stringify(mea_names, null, 2));
     }
 
-    console.log("converting data to Tabulator format...")
+    if (info) { console.log("converting data to Tabulator format...") }
     tabulator_data = updateDataTableWithMeasureValues(data, tabulator_data, pivot_fields, pivot_index, mea_names, config);
 
     // Update column definitions with measures information
-    console.log("generating columns and headers for Tabulator...")
+    if (info) { console.log("generating columns and headers for Tabulator...") }
     if (pivot_fields.length > 0) {
       if (config.use_sparklines) {
         branch_index = spark_index
@@ -1663,7 +1744,7 @@ looker.plugins.visualizations.add({
         
         // persistentLayout:true,   // fails due to sandboxing
         movableColumns: true,
-        resizableColumns: true,
+        resizableColumns: false,
         resizableRows: false,
         
         groupBy: group_by,
