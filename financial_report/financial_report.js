@@ -1148,6 +1148,8 @@ insertMeasuresLeaves = function(measures_array, branch, index, iteration=1) {
  */
 applyMeasureFormat = function(mea_object, mea_definition, config, row_totals_only=false) {
   // Sparkline columns do not support top or bottom calculations
+  // TODO: Support for Custom Measures
+  // TODO: Support Table Calcs
   if (!config.use_sparklines) {
     if (["sum", "count", "count_distinct"].includes(mea_object.type)) {
       mea_definition["bottomCalc"] = "sum";
@@ -1310,7 +1312,7 @@ buildMeasuresHeadersTree = function(fields, keys, metrics, vis_config) {
         looker_definition = metrics[metric];
 
         if (vis_config.use_sparklines && depth == 0) {
-          safe_name = "pivoted_measures|" + looker_definition.name.replace(".", "|");  
+          safe_name = "pivots|" + looker_definition.name.replace(".", "|");  
         } else {
           safe_name = branch_key + '|' + looker_definition.name.replace(".", "|");
         }
@@ -1416,7 +1418,7 @@ buildSparklinePivotIndex = function(fields, keys) {
       if (keys[pivot_column].key == '$$$_row_total_$$$') {
         spark_key = "$$$_row_total_$$$";
       } else {
-        spark_key = "pivoted_measures";
+        spark_key = "pivots";
       }
       keys[pivot_column]["spark_key"] = spark_key
 
@@ -1503,6 +1505,7 @@ updateDataTableWithMeasureValues = function(data_in, data_out, fields, keys, met
               if (spark_key_value != null && spark_data_points) {
                 var field_name = spark_key_value + '|' + safe_name
                 data_out[row][field_name] = spark_data_points;
+                console.log("flush", field_name);
               }
 
               // Start a new spark_data_points_array
@@ -1515,6 +1518,7 @@ updateDataTableWithMeasureValues = function(data_in, data_out, fields, keys, met
                   if (data_value) {
                     data_out[row][field_name] = data_value;
                   }
+                  console.log("flush", field_name);
                 } else {
                   spark_data_points = [data_value];  
                 }
@@ -1553,10 +1557,7 @@ updateDataTableWithMeasureValues = function(data_in, data_out, fields, keys, met
                   } else {
                     field_name = spark_key_value + '|' + safe_name
                     data_out[row][field_name] = spark_data_points
-
-                    if (debug_data) {
-                      console.log("Flush values due to processing last array: ", field_name, spark_data_points)
-                    }
+                    console.log("flush", field_name);
                   }
                 }
               }
@@ -1709,9 +1710,11 @@ looker.plugins.visualizations.add({
       } else {
         branch_index = pivot_index
       }
-      tree_headers = buildMeasuresHeadersTree(pivot_fields, branch_index, measures, config);
-      row_total_headers = buildMeasuresHeadersFlat(measures, config, true);
-      mea_details = tree_headers.concat(row_total_headers);
+      mea_details = buildMeasuresHeadersTree(pivot_fields, branch_index, measures, config);
+      if () {
+        row_total_headers = buildMeasuresHeadersFlat(measures, config, true);
+        mea_details = mea_details.concat(row_total_headers);        
+      }
     } else {
       mea_details = buildMeasuresHeadersFlat(measures, config, false);
     }
