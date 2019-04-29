@@ -1553,7 +1553,8 @@ updateDataTableWithMeasureValues = function(data_in, data_out, fields, keys, met
 
                 if (last_sparklines_array) {
                   if (fields.length == 1 && spark_key_value != "$$$_row_total_$$$") {
-                    data_out[row][safe_name] = spark_data_points
+                    field_name = 'pivots|' + safe_name
+                    data_out[row][field_name] = spark_data_points
                     console.log("flush", field_name);
                   } else {
                     field_name = spark_key_value + '|' + safe_name
