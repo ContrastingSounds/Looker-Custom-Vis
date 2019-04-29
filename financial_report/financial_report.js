@@ -1711,7 +1711,7 @@ looker.plugins.visualizations.add({
         branch_index = pivot_index
       }
       mea_details = buildMeasuresHeadersTree(pivot_fields, branch_index, measures, config);
-      if () {
+      if (queryResponse.has_row_totals) {
         row_total_headers = buildMeasuresHeadersFlat(measures, config, true);
         mea_details = mea_details.concat(row_total_headers);        
       }
