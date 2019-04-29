@@ -7,7 +7,7 @@
  *   debug flags
  */ 
 info = true;
-debug = false;
+debug = true;
 debug_spark_index = false;
 debug_measure_tree = false;
 debug_data = false;
@@ -948,9 +948,9 @@ checkResponseForErrors = function(config, queryResponse, details) {
   } 
 
   // ROW TOTALS?
-  if (queryResponse.has_row_totals && 1==2) {
-    error_string = error_string.concat("Row totals are not supported. ")
-  }
+  // if (queryResponse.has_row_totals) {
+  //   error_string = error_string.concat("Row totals are not supported. ")
+  // }
 
   // SUPERMEASURES?
   if (typeof queryResponse.fields.supermeasure_like !== 'undefined'
@@ -1130,17 +1130,7 @@ insertColumnGroup = function(group, branch, index, iteration=1) {
  *            index.length will be equal to number of pivots for sparklines, plus one for non-sparklines
  */
 insertMeasuresLeaves = function(measures_array, branch, index, iteration=1) {
-  if (debug_measure_tree) {
-    console.log("insertMeasuresLeaves, depth:", JSON.stringify(iteration, null, 2));
-    console.log("--measures_array:", JSON.stringify(measures_array, null, 2));
-    console.log("--branch:", JSON.stringify(branch, null, 2));
-    console.log("--index:", JSON.stringify(index, null, 2));
-  }
-
   if (iteration == index.length) {
-    if (debug_measure_tree) {
-      console.log("Inserting Measures Leaves at:", index);      
-    }
     branch.columns = measures_array;
   } else {
     branch_index = index[iteration - 1];
@@ -1156,7 +1146,7 @@ insertMeasuresLeaves = function(measures_array, branch, index, iteration=1) {
  * Number formats are defined at the top of the file in the number_formats object.
  * Formatter functions (including spark lines) stored in formatters object.
  */
-applyMeasureFormat = function(mea_object, mea_definition, config) {
+applyMeasureFormat = function(mea_object, mea_definition, config, row_totals_only=false) {
   // Sparkline columns do not support top or bottom calculations
   if (!config.use_sparklines) {
     if (["sum", "count", "count_distinct"].includes(mea_object.type)) {
@@ -1167,7 +1157,7 @@ applyMeasureFormat = function(mea_object, mea_definition, config) {
     }
   }
 
-  if (config.use_sparklines && config.query_fields.pivots.length > 0) {
+  if (config.use_sparklines && config.query_fields.pivots.length > 0 && row_totals_only == false) {
     mea_definition["formatter"] = formatters["spark_line"]; 
   } else if (mea_object.value_format != null) {        
     if (mea_object.value_format.indexOf("$") !== -1) {
@@ -1287,12 +1277,6 @@ buildMeasuresHeadersTree = function(fields, keys, metrics, vis_config) {
       for (level = 0; level < depth; level++) {
         current_node_value = keys[branch].data[fields[level].name];
 
-        if (debug_measure_tree) {
-          console.log("*** level loop", level);
-          console.log("*** current_node_value", current_node_value);
-          console.log("*** latest_branch_value", latest_branch_value);
-        }
-
         if (current_node_value != latest_branch_value[level]) {
           if (debug_measure_tree) {
             console.log("New node value encountered, will extend tree at this level with new column group");  
@@ -1319,9 +1303,6 @@ buildMeasuresHeadersTree = function(fields, keys, metrics, vis_config) {
         }
       }
       tree_index.push(0)
-      if (debug_measure_tree) {
-        console.log('All levels of branch processed. New tree_index location for measure leaves:', tree_index);
-      }
 
       // Once we have the indices for the current column group, push in all the measures
       leaves = []
@@ -1329,7 +1310,7 @@ buildMeasuresHeadersTree = function(fields, keys, metrics, vis_config) {
         looker_definition = metrics[metric];
 
         if (vis_config.use_sparklines && depth == 0) {
-          safe_name = looker_definition.name.replace(".", "|");  
+          safe_name = "pivoted_measures|" + looker_definition.name.replace(".", "|");  
         } else {
           safe_name = branch_key + '|' + looker_definition.name.replace(".", "|");
         }
@@ -1380,30 +1361,33 @@ buildMeasuresHeadersFlat = function(measures, config, row_totals_only=false) {
   var mea_details = []
   
   for (var i = 0; i < measures.length; i++) {
-    if (row_totals_only && measures[i].hasOwnProperty("can_pivot")) {
-      // do nothing
-    } else {
-      var mea_name = measures[i].name
-      mea_names.push(mea_name)
-      
-      var safe_name = mea_name.replace(".", "|")
-      var looker_definition = measures[i]
-
-      if (looker_definition.hasOwnProperty("label_short")) {
-        measure_title = looker_definition.label_short
-      } else {
-        measure_title = looker_definition.label
-      }
-
-      tabulator_definition = {
-        title: measure_title,
-        field: safe_name,
-        align: looker_definition.align,
-      }
-
-      tabulator_definition = applyMeasureFormat(looker_definition, tabulator_definition, config);
-      mea_details.push(tabulator_definition)      
+    if (row_totals_only && measures[i].hasOwnProperty("can_pivot") && measures[i].can_pivot == true) {
+      continue;
     }
+    var mea_name = measures[i].name
+    mea_names.push(mea_name)
+    
+    if (row_totals_only) {
+      var safe_name = "$$$_row_total_$$$|" + mea_name.replace(".", "|")
+    } else {
+      var safe_name = mea_name.replace(".", "|")
+    }  
+    var looker_definition = measures[i]
+
+    if (looker_definition.hasOwnProperty("label_short")) {
+      measure_title = looker_definition.label_short
+    } else {
+      measure_title = looker_definition.label
+    }
+
+    tabulator_definition = {
+      title: measure_title,
+      field: safe_name,
+      align: looker_definition.align,
+    }
+
+    tabulator_definition = applyMeasureFormat(looker_definition, tabulator_definition, config, row_totals_only);
+    mea_details.push(tabulator_definition)      
   }
 
   return mea_details
@@ -1426,22 +1410,41 @@ buildSparklinePivotIndex = function(fields, keys) {
   current_spark_key = null;
   spark_index = [];
 
-  for (pivot_column = 0; pivot_column < keys.length; pivot_column++) {
-    spark_key_values = [];
-    for (field = 0; field < fields.length - 1; field++) {
-      field_name = fields[field].name;
-      field_value = keys[pivot_column].data[field_name];
-      spark_key_values.push(field_value);
-    }
+  // Single pivot tables handled differently to multi-pivot tables
+  if (fields.length == 1) {
+    for (pivot_column = 0; pivot_column < keys.length; pivot_column++) {
+      if (keys[pivot_column].key == '$$$_row_total_$$$') {
+        spark_key = "$$$_row_total_$$$";
+      } else {
+        spark_key = "pivoted_measures";
+      }
+      keys[pivot_column]["spark_key"] = spark_key
 
-    spark_key = spark_key_values.join("|FIELD|");
-    keys[pivot_column]["spark_key"] = spark_key
-
-    if (spark_key != current_spark_key) {
-      spark_index.push(keys[pivot_column])
+      if (spark_key != current_spark_key) {
+        spark_index.push(keys[pivot_column])
+      }
+      current_spark_key = spark_key
     }
-    current_spark_key = spark_key
+  // Multi-pivot tables
+  } else {
+    for (pivot_column = 0; pivot_column < keys.length; pivot_column++) {
+      spark_key_values = [];
+      for (field = 0; field < fields.length - 1; field++) {
+        field_name = fields[field].name;
+        field_value = keys[pivot_column].data[field_name];
+        spark_key_values.push(field_value);
+      }
+
+      spark_key = spark_key_values.join("|FIELD|");
+      keys[pivot_column]["spark_key"] = spark_key
+
+      if (spark_key != current_spark_key) {
+        spark_index.push(keys[pivot_column])
+      }
+      current_spark_key = spark_key
+    }    
   }
+
 
   if (debug_spark_index) {
     console.log("===== buildSparklinePivotIndex() before return =====");
@@ -1463,7 +1466,7 @@ buildSparklinePivotIndex = function(fields, keys) {
  * metrics: Looker measures
  * vis_config: main vis object
  */
-updateDataTableWithMeasureValues = function(data_in, data_out, fields, keys, metrics, vis_config) {
+updateDataTableWithMeasureValues = function(data_in, data_out, fields, keys, metrics, vis_config, queryResponse) {
   if (debug_data) {
     console.log("===== updateDataTableWithMeasureValues() called with =====");
     console.log("data_in", JSON.stringify(data_in, null, 2));
@@ -1471,6 +1474,8 @@ updateDataTableWithMeasureValues = function(data_in, data_out, fields, keys, met
     console.log("keys.length", keys.length);
     console.log("keys", JSON.stringify(keys, null, 2));
     console.log("metrics", JSON.stringify(metrics, null, 2));
+    console.log("sparklines?", vis_config.use_sparklines);
+    console.log("row_totals?", queryResponse.has_row_totals);
   }
 
   // PIVOT TABLE
@@ -1479,81 +1484,87 @@ updateDataTableWithMeasureValues = function(data_in, data_out, fields, keys, met
       for (var metric = 0; metric < metrics.length; metric++) {
         raw_name = metrics[metric]
         safe_name = raw_name.replace(".", "|")
-        if (debug_data) {
-          console.log("PROCESSING ROW:", row, "METRIC:", raw_name);
-          console.log("row:", data_in[row])
-        }      // Avoid first row for debug output
 
         spark_key_value = null;
         spark_data_points = []; // array to store values for the sparkline
+        last_sparklines_array = false;
 
         for (key = 0; key < keys.length; key++) {
           key_value = keys[key].key
 
-          if (key_value != "$$$_row_total_$$$") {     // Ignore row_totals for now
-            if (vis_config.use_sparklines) {
-              var latest_spark_key_value =  keys[key].spark_key   // getSparklinePivotIndex(fields, keys, key)
+          if (vis_config.use_sparklines) {
+            var latest_spark_key_value =  keys[key].spark_key 
 
-              // If the spark_name has changed,
-              // "flush" the current values into a data entry
-              if (latest_spark_key_value != spark_key_value) {
+            // If the spark_name has changed while processing the data row,
+            // flush the current values into a data entry
+            if (latest_spark_key_value != spark_key_value) {
 
-                // Only flush if there's valid data                
-                if (spark_key_value != null && spark_data_points) {
-                  var field_name = spark_key_value + '|' + safe_name
-                  data_out[row][field_name] = spark_data_points;
-      
-                  if (debug_data) {
-                    console.log("Flush values due to change in key value: ", field_name, spark_data_points)
+              // Only flush if there's valid data                
+              if (spark_key_value != null && spark_data_points) {
+                var field_name = spark_key_value + '|' + safe_name
+                data_out[row][field_name] = spark_data_points;
+              }
+
+              // Start a new spark_data_points_array
+              if (typeof data_in[row][raw_name][key_value] !== 'undefined') {
+                var data_value = data_in[row][raw_name][key_value].value
+
+                // If processing row totals, instead push entry straight into data row
+                if (key_value == "$$$_row_total_$$$") {
+                  var field_name = "$$$_row_total_$$$|" + safe_name
+                  if (data_value) {
+                    data_out[row][field_name] = data_value;
+                  }
+                } else {
+                  spark_data_points = [data_value];  
+                }
+              }
+
+              // Reset the spark_key tracker
+              spark_key_value = latest_spark_key_value;
+
+            } else { // Otherwise, push current value into spark_data_points array
+              if (typeof data_in[row][raw_name][key_value] !== 'undefined') {
+                var data_value = data_in[row][raw_name][key_value].value;
+                spark_data_points.push(data_value);
+
+                // If processing the last spark_data_points array in the row,
+                // flush the current values into a data entry
+                //
+                // Ways to identify the last array:
+                //   if row totals are present:
+                //     Processing the last metric AND the next key is a row total
+                //   else:  
+                //     Processing the last metric AND processing last key
+                //
+                if (queryResponse.has_row_totals) {
+                  if (metric + 1 == metrics.length && keys[key + 1].key == "$$$_row_total_$$$") {
+                    last_sparklines_array = true 
+                  }
+                } else {
+                  if (metric + 1 == metrics.length && key + 1 == keys.length) {
+                    last_sparklines_array = true
                   }
                 }
 
-                // Start the spark_data_points_array
-                if (typeof data_in[row][raw_name][key_value] !== 'undefined') {
-                  var data_value = data_in[row][raw_name][key_value].value
-                  spark_data_points = [data_value];
-                }
+                if (last_sparklines_array) {
+                  if (fields.length == 1 && spark_key_value != "$$$_row_total_$$$") {
+                    data_out[row][safe_name] = spark_data_points
+                  } else {
+                    field_name = spark_key_value + '|' + safe_name
+                    data_out[row][field_name] = spark_data_points
 
-                spark_key_value = latest_spark_key_value;
-
-              } else { // Otherwise, just push the current value into spark_values
-                if (typeof data_in[row][raw_name][key_value] !== 'undefined') {
-                  var data_value = data_in[row][raw_name][key_value].value;
-                  spark_data_points.push(data_value);
-                  
-                  // if there's only a single pivot field, flush at end of row
-                  if (debug_data) {
-                    console.log("spark_data_points", spark_key_value, spark_data_points);
-                    console.log("key", key+1, keys.length);
-                  }
-                  // if (fields.length == 1 && key + 1 == keys.length) {
-                  if (key + 1 == keys.length) {
-                    if (fields.length == 1) {
-                      data_out[row][safe_name] = spark_data_points
-                    } else {
-                      field_name = spark_key_value + '|' + safe_name
-                      data_out[row][field_name] = spark_data_points
-
-                      if (debug_data) {
-                        console.log("Flush values due to reaching final key: ", field_name, spark_data_points)
-                      }
+                    if (debug_data) {
+                      console.log("Flush values due to processing last array: ", field_name, spark_data_points)
                     }
                   }
                 }
-              }  
-
-            } else { // Build flat table, no sparklines
+              }
+            }
+          } else { // Build flat table, no sparklines
+            if (typeof data_in[row][raw_name][key_value] !== 'undefined') {
               var field_name = key_value + '|' + safe_name
               data_value = data_in[row][raw_name][key_value].value
-              if (data_value) {
-                data_out[row][field_name] = data_value; 
-              } 
-            }
-          } else {
-            // if queryResponse.can_pivot = false
-            if (typeof data_in[row][raw_name][key_value] !== 'undefined') {
-              var field_name = key_value + '|' + safe_name //
-              data_value = data_in[row][raw_name][key_value].value // 
               if (data_value) {
                 data_out[row][field_name] = data_value; 
               }            
@@ -1575,9 +1586,6 @@ updateDataTableWithMeasureValues = function(data_in, data_out, fields, keys, met
           
           data_out[row][safe_name] = data_in[row][raw_name].value;
       }
-    }
-    if (debug) {
-      console.log("updateDataTableWithMeasureValues complete, data_out:", JSON.stringify(data_out, null, 2));
     }
     return data_out
   }
@@ -1691,7 +1699,7 @@ looker.plugins.visualizations.add({
     var mea_names = buildMeasureNames(measures);
 
     if (info) { console.log("converting data to Tabulator format...") }
-    tabulator_data = updateDataTableWithMeasureValues(data, tabulator_data, pivot_fields, pivot_index, mea_names, config);
+    tabulator_data = updateDataTableWithMeasureValues(data, tabulator_data, pivot_fields, pivot_index, mea_names, config, queryResponse);
 
     // Update column definitions with measures information
     if (info) { console.log("generating columns and headers for Tabulator...") }
@@ -1725,7 +1733,7 @@ looker.plugins.visualizations.add({
     if (debug) {
       console.log("==== Tabulator.js columns and data ====")
       console.log("table_col_details:", JSON.stringify(table_col_details, null, 2));
-      console.log("tabulator_data:", JSON.stringify(tabulator_data, null, 2));
+      console.log("tabulator_data:", JSON.stringify(tabulator_data[0], null, 2));
       console.log("group_by:", JSON.stringify(group_by, null, 2));
       console.log("initial_sort:", JSON.stringify(initial_sort, null, 2));
     }
