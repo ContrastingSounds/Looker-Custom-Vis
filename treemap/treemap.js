@@ -64,8 +64,42 @@ global_options = {
   breadcrumbs: {
     type: "array",
     default: [],
-  }
+  },
+
+  // Dev Options
+  dumpData: {
+    section: "Debug",
+    type: "boolean",
+    label: "data",
+    default: "false",
+    display_size: "half",
+  },
+  dumpConfig: {
+    section: "Debug",
+    type: "boolean",
+    label: "config",
+    default: "false",
+    display_size: "half",    
+  },
+  dumpQueryResponse: {
+    section: "Debug",
+    type: "boolean",
+    label: "queryResponse",
+    default: "false",
+    display_size: "half",    
+  },
+  dumpTreeData: {
+    section: "Debug",
+    type: "boolean",
+    label: "treemap",
+    default: "false",
+    display_size: "half",    
+  },
 };
+
+const dumpToConsole = function(message, obj) {
+    console.log(message, JSON.stringify(obj, null, 2));
+}
 
 convertQueryDatasetToVisData = function(data, queryResponse) {
     var vis_data = [];
@@ -149,7 +183,7 @@ looker.plugins.visualizations.add({
     },
 
     create: function(element, config) {
-        console.log("create() called");
+        console.log("create() called, color:", config.cellColor);
         this.style = document.createElement('style');
         document.head.appendChild(this.style);
 
@@ -167,9 +201,10 @@ looker.plugins.visualizations.add({
         console.log("updateAsync() called");
         this.clearErrors();
         this.style.innerHTML = defaultTheme;
-        console.log("#data\n", JSON.stringify(data, null, 2));
-        console.log("#config\n", JSON.stringify(config, null, 2));
-        console.log("#queryResponse\n", JSON.stringify(queryResponse, null, 2));
+
+        if (config.dumpData) { dumpToConsole("data: ", data) }
+        if (config.dumpConfig) { dumpToConsole("config: ", config) }
+        if (config.dumpQueryResponse) { dumpToConsole("queryResponse: ", queryResponse) }
 
 
         var vis = this;
@@ -202,7 +237,7 @@ looker.plugins.visualizations.add({
         console.log("color by", config["colorBy"]);
 
         var colorScale = d3.scaleOrdinal()
-                            .range(config["cellColor"]);
+                           .range(config.cellColor);            
 
         var treemap = d3.treemap()
             .size([chartWidth, chartHeight])
