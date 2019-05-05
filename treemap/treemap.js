@@ -1,4 +1,4 @@
-
+// 
 const defaultTheme = `
     rect:hover {
         fill: orange;
@@ -30,6 +30,10 @@ const defaultTheme = `
         font-family: sans-serif;
         font-size: 12px;
         line-height: 15px;
+    }
+
+    #tooltip span {
+        pointer-events: auto;
     }
 
     .textdiv {
@@ -320,15 +324,27 @@ looker.plugins.visualizations.add({
             return cell_string
         }
 
+        // TODO: Fix issue with flickering drill down links
         var getTooltip = function(d) {
             var tiptext = "";
             if (d.height === 0) {
                 for (var prop in hierarchy) {
+                    var metadata = d.data.metadata[hierarchy[prop]];
                     tiptext += "<p><em>" + hierarchy[prop] + ":</em> " + d.data[hierarchy[prop]] + "</p>";
+                    for (var link in metadata.links) {
+                        var link_markup = ['<span style="float: right"><a href="', metadata.links[link].url, '">', metadata.links[link].label, '</a></span><br>'].join('')
+                        tiptext += link_markup;
+                    }
                 }
+                tiptext += '<br>'
 
                 for (var measure in measures) {
-                    tiptext += "<p><em>" + measures[measure] + ":</em> " + d.data.metadata[measures[measure]].rendered + "</p>";
+                    var metadata = d.data.metadata[measures[measure]];
+                    tiptext += "<p><em>" + measures[measure] + ":</em> " + metadata.rendered + "</p>";
+                    for (var link in metadata.links) {
+                        var link_markup = ['<span style="float: right"><a href="', metadata.links[link].url, '">', metadata.links[link].label, '</a></span><br>'].join('')
+                        tiptext += link_markup;
+                    }
                 }
             } else {
                 tiptext += d.data.key;
@@ -388,10 +404,9 @@ looker.plugins.visualizations.add({
                         //Update the tooltip position and value
                         d3.select("#tooltip")
                             .style("left", xPosition + "px")
-                            .style("top", yPosition + "px")                     
+                            .style("top", yPosition + "px")                   
                             .html(getTooltip(d));
 
-                        console.log('d for tooltip:', d)
                         //Show the tooltip
                         d3.select("#tooltip").classed("hidden", false);
                     })
