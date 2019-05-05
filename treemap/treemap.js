@@ -183,7 +183,6 @@ looker.plugins.visualizations.add({
     },
 
     create: function(element, config) {
-        console.log("create() called, color:", config.cellColor);
         this.style = document.createElement('style');
         document.head.appendChild(this.style);
 
@@ -198,7 +197,6 @@ looker.plugins.visualizations.add({
     },
 
     updateAsync: function(data, element, config, queryResponse, details, done) {
-        console.log("updateAsync() called");
         this.clearErrors();
         this.style.innerHTML = defaultTheme;
 
@@ -222,19 +220,12 @@ looker.plugins.visualizations.add({
         var dimensions = queryResponse.fields.dimension_like;
         var measures = queryResponse.fields.measure_like;
         
-        vis_data = convertQueryDatasetToVisData(data, queryResponse);
-        console.log("Treemap Data", vis_data);
-
+        var vis_data = convertQueryDatasetToVisData(data, queryResponse);
         var hierarchy = getHierarchy(queryResponse);
-        console.log("Hierarchy", hierarchy);
-
         var measures = getMeasures(queryResponse);
-        console.log("Measures", measures);
 
         new_options = getNewConfigOptions(dimensions, measures);
         vis.trigger("registerOptions", new_options);
-        console.log("colors", config["cellColor"]);
-        console.log("color by", config["colorBy"]);
 
         var colorScale = d3.scaleOrdinal()
                            .range(config.cellColor);            
@@ -255,7 +246,7 @@ looker.plugins.visualizations.add({
 
         var updateCurrentBranch = function(branch, keys) {
             if (keys.length === 0) {
-                console.log("...returning final branch", branch);
+                // returning final branch
                 current_branch = branch;
             } else {
                 var key = keys.shift();
@@ -353,10 +344,6 @@ looker.plugins.visualizations.add({
             displayChart(root);
 
             function displayChart(d) {
-                console.log("Displaying chart for", d.data.key);
-                console.log("Current breadcrumbs:", config.breadcrumbs);
-                console.log("Current treemap:", d);
-
                 d3.select("#treemapSVG").remove();
 
                 var svg = d3.select("#treemapContainer")
@@ -417,15 +404,12 @@ looker.plugins.visualizations.add({
             
                 function zoom(d) {
                     if (d.depth === 0) {
-                        console.log("zoom up called for");
                         if (config.breadcrumbs.length === 0) {
-                            console.log("zoom cancelled, already at root node")
+                            // zoom cancelled, already at root node
                         } else {
                             config.breadcrumbs.pop();
-                            console.log("zoom up to (breadcrumbs):", config.breadcrumbs);
-                            
+                            // zoom up
                             updateCurrentBranch(nested_data, config.breadcrumbs.slice(0));
-                            console.log("current_branch:", current_branch);
 
                             root = treemap(d3.hierarchy(current_branch, d => d.values)
                                 .sum(d => getSize(d)))
@@ -433,11 +417,10 @@ looker.plugins.visualizations.add({
                         }
                     } else {
                         while (d.depth > 1) {
-                            console.log("depth:", d.depth);
                             d = d.parent;
                         }
                         config.breadcrumbs.push(d.data.key);
-                        console.log("zoom down to (breadcrumbs):", config.breadcrumbs);
+                        // zoom down
                         root = treemap(d3.hierarchy(d.data, d => d.values)
                             .sum(d => getSize(d))
                         );
