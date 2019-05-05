@@ -253,7 +253,7 @@ looker.plugins.visualizations.add({
             })
             .round(true);
 
-        var update_current_branch = function(branch, keys) {
+        var updateCurrentBranch = function(branch, keys) {
             if (keys.length === 0) {
                 console.log("...returning final branch", branch);
                 current_branch = branch;
@@ -263,14 +263,14 @@ looker.plugins.visualizations.add({
                 for (var value in branch.values) {
                     if (branch !== undefined) {
                         if (branch.values[value].key === key) {
-                            branch = update_current_branch(branch.values[value], keys);
+                            branch = updateCurrentBranch(branch.values[value], keys);
                         }
                     }
                 }
             };
         }
 
-        var get_size = function(d) {
+        var getSize = function(d) {
             if (config["sizeBy"] == "count_of_rows") {
                 return !d.key ? 1 : 0;
             } else {
@@ -279,7 +279,7 @@ looker.plugins.visualizations.add({
             }
         }
 
-        var get_color = function(d) {
+        var getColor = function(d) {
             if (d.height === 0) {
                 if (config.takeColorFromCellValue) {
                     return d.data[config["colorBy"]];
@@ -293,7 +293,7 @@ looker.plugins.visualizations.add({
             }
         }
 
-        var get_cell_text = function(d) {
+        var getCellText = function(d) {
             if (d.depth === 0) {
                 if (config.breadcrumbs.length === 0) {
                     cell_string = " – Top Level: click on cells to zoom in, this bar to zoom out – "    
@@ -317,7 +317,7 @@ looker.plugins.visualizations.add({
             return cell_string
         }
 
-        var get_tooltip = function(d) {
+        var getTooltip = function(d) {
             var tiptext = "";
             if (d.height === 0) {
                 for (var prop in hierarchy) {
@@ -334,7 +334,7 @@ looker.plugins.visualizations.add({
             return tiptext;
         }
 
-        var create_treemap = function(data) {
+        var createTreemap = function(data) {
             var nested_data = d3.nest();
             dimensions.forEach(dim => 
                 nested_data = nested_data.key(d => d[dim.name]));
@@ -346,13 +346,13 @@ looker.plugins.visualizations.add({
 
             var root = treemap(
                 d3.hierarchy(nested_data, d => d.values)
-                  .sum(d => get_size(d))
-                  .sort(function(a, b) {return b.height - a.height || get_size(b) - get_size(a)})
+                  .sum(d => getSize(d))
+                  .sort(function(a, b) {return b.height - a.height || getSize(b) - getSize(a)})
             );
 
-            display_chart(root);
+            displayChart(root);
 
-            function display_chart(d) {
+            function displayChart(d) {
                 console.log("Displaying chart for", d.data.key);
                 console.log("Current breadcrumbs:", config.breadcrumbs);
                 console.log("Current treemap:", d);
@@ -378,7 +378,7 @@ looker.plugins.visualizations.add({
                     .attr("y", d => d.y0)
                     .attr("width", d => d.x1 - d.x0)
                     .attr("height", d => d.y1 - d.y0)
-                    .attr("fill", d => get_color(d))
+                    .attr("fill", d => getColor(d))
                     .attr("stroke", "AliceBlue")
 
                     .on("mouseover", function(d) {
@@ -390,7 +390,7 @@ looker.plugins.visualizations.add({
                         d3.select("#tooltip")
                             .style("left", xPosition + "px")
                             .style("top", yPosition + "px")                     
-                            .html(get_tooltip(d));
+                            .html(getTooltip(d));
                    
                         //Show the tooltip
                         d3.select("#tooltip").classed("hidden", false);
@@ -412,7 +412,7 @@ looker.plugins.visualizations.add({
                     .attr("pointer-events", "none")
                     .attr("white-space", "nowrap")
                   .append("xhtml:div")
-                    .html(d => get_cell_text(d))
+                    .html(d => getCellText(d))
                     .attr("class", "textdiv"); //textdiv class allows us to style the text easily with CSS
             
                 function zoom(d) {
@@ -424,12 +424,12 @@ looker.plugins.visualizations.add({
                             config.breadcrumbs.pop();
                             console.log("zoom up to (breadcrumbs):", config.breadcrumbs);
                             
-                            update_current_branch(nested_data, config.breadcrumbs.slice(0));
+                            updateCurrentBranch(nested_data, config.breadcrumbs.slice(0));
                             console.log("current_branch:", current_branch);
 
                             root = treemap(d3.hierarchy(current_branch, d => d.values)
-                                .sum(d => get_size(d)))
-                            display_chart(root);
+                                .sum(d => getSize(d)))
+                            displayChart(root);
                         }
                     } else {
                         while (d.depth > 1) {
@@ -439,16 +439,16 @@ looker.plugins.visualizations.add({
                         config.breadcrumbs.push(d.data.key);
                         console.log("zoom down to (breadcrumbs):", config.breadcrumbs);
                         root = treemap(d3.hierarchy(d.data, d => d.values)
-                            .sum(d => get_size(d))
+                            .sum(d => getSize(d))
                         );
                         
-                        display_chart(root);
+                        displayChart(root);
                     }
                 }
             }
         }
         
-        create_treemap(vis_data);
+        createTreemap(vis_data);
         done();
     }
 });
