@@ -1,5 +1,5 @@
 
-defaultTheme = `
+const defaultTheme = `
     rect:hover {
         fill: orange;
     }
@@ -40,8 +40,10 @@ defaultTheme = `
         white-space: nowrap;
     }
 `
+const defaultHeaderColor = "orange";
+const defaultCellColor = "AliceBlue";
 
-global_options = {
+const global_options = {
   showSubHeaders: {
     section: "Data",
     type: "boolean",
@@ -101,19 +103,29 @@ const dumpToConsole = function(message, obj) {
     console.log(message, JSON.stringify(obj, null, 2));
 }
 
-convertQueryDatasetToVisData = function(data, queryResponse) {
+const convertQueryDatasetToVisData = function(data, queryResponse) {
     var vis_data = [];
     data.forEach(d => {
         var row = {};
+        row['metadata'] = {};
         for (var [key, value] of Object.entries(d)) {
             row[key] = value.value;
+            if (typeof value.rendered !== 'undefined') {
+                var render = value.rendered
+            } else {
+                var render = value.value
+            }
+            row['metadata'][key] = {
+                rendered: render,
+                links: value.links,
+            }
         }
         vis_data.push(row);
     });
     return vis_data;
 }
 
-getHierarchy = function(queryResponse) {
+const getHierarchy = function(queryResponse) {
     var hierarchy = [];
     queryResponse.fields.dimension_like.forEach(d => {
         hierarchy.push(d.name);
@@ -121,7 +133,7 @@ getHierarchy = function(queryResponse) {
     return hierarchy;
 }
 
-getMeasures = function(queryResponse) {
+const getMeasures = function(queryResponse) {
     var measures = [];
     queryResponse.fields.measure_like.forEach(d => {
         measures.push(d.name);
@@ -129,7 +141,7 @@ getMeasures = function(queryResponse) {
     return measures;
 }
 
-getNewConfigOptions = function(dimensions, measures) {
+const getNewConfigOptions = function(dimensions, measures) {
     new_options = global_options;
 
     size_by_options = [];
@@ -212,7 +224,7 @@ looker.plugins.visualizations.add({
         var chartHeight = element.clientHeight - 16;
 
         var headerHeight = margin.top;
-        var headerColor = "orange";
+        var headerColor = defaultHeaderColor;
         var number_of_headers = 2;
 
         var current_branch;
@@ -280,7 +292,7 @@ looker.plugins.visualizations.add({
             } else if (d.depth === 0) {
                 return headerColor;
             } else {
-                return "AliceBlue";
+                return defaultCellColor;
             }
         }
 
@@ -299,7 +311,7 @@ looker.plugins.visualizations.add({
                     cell_string = "";
                 } else {
                     idx = Number(config["sizeBy"]);
-                    cell_string = d.data[measures[idx]];                    
+                    cell_string = d.data.metadata[measures[idx]].rendered;                    
                 }
             } else {
                 cell_string = "";
@@ -316,7 +328,7 @@ looker.plugins.visualizations.add({
                 }
 
                 for (var measure in measures) {
-                    tiptext += "<p><em>" + measures[measure] + ":</em> " + d.data[measures[measure]] + "</p>";
+                    tiptext += "<p><em>" + measures[measure] + ":</em> " + d.data.metadata[measures[measure]].rendered + "</p>";
                 }
             } else {
                 tiptext += d.data.key;
@@ -363,10 +375,10 @@ looker.plugins.visualizations.add({
                 treemapCells.append("rect")
                     .attr("x", d => d.x0)
                     .attr("y", d => d.y0)
-                    .attr("width", d => d.x1 - d.x0)
-                    .attr("height", d => d.y1 - d.y0)
+                    .attr("width", d => Math.max(0, d.x1 - d.x0))
+                    .attr("height", d => Math.max(0, d.y1 - d.y0))
                     .attr("fill", d => getColor(d))
-                    .attr("stroke", "AliceBlue")
+                    .attr("stroke", defaultCellColor)
 
                     .on("mouseover", function(d) {
                         //Get this bar's x/y values, then augment for the tooltip
@@ -378,7 +390,8 @@ looker.plugins.visualizations.add({
                             .style("left", xPosition + "px")
                             .style("top", yPosition + "px")                     
                             .html(getTooltip(d));
-                   
+
+                        console.log('d for tooltip:', d)
                         //Show the tooltip
                         d3.select("#tooltip").classed("hidden", false);
                     })
@@ -392,8 +405,8 @@ looker.plugins.visualizations.add({
                 treemapCells.append("foreignObject")
                     .attr("x", d => d.x0 + 3)
                     .attr("y", d => d.y0)
-                    .attr("width", d => d.x1 - d.x0 - 3)
-                    .attr("height", d => d.y1 - d.y0)
+                    .attr("width", d => Math.max(0, d.x1 - d.x0 - 3))
+                    .attr("height", d => Math.max(0, d.y1 - d.y0))
                     .attr("fill", '#bbbbbb')
                     .attr("class", "foreignobj")
                     .attr("pointer-events", "none")
