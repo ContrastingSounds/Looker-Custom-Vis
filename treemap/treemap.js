@@ -50,6 +50,7 @@ const global_options = {
     label: "Show Sub Headers",
     default: "true"
   },
+  // TODO: Implement Color By Cell Value
   takeColorFromCellValue: {
     section: "Data",
     type: "boolean",
@@ -190,7 +191,7 @@ const getNewConfigOptions = function(dimensions, measures) {
     return new_options;
 }
 
-looker.plugins.visualizations.add({
+const vis = {
     options: {
       showSubHeaders: {
         section: "Data",
@@ -226,20 +227,18 @@ looker.plugins.visualizations.add({
         if (config.dumpConfig) { dumpToConsole("config: ", config) }
         if (config.dumpQueryResponse) { dumpToConsole("queryResponse: ", queryResponse) }
 
+        const margin = {top: 20, right: 0, bottom: 0, left: 0};
+        const chartWidth = element.clientWidth;
+        const chartHeight = element.clientHeight - 16;
 
-        var vis = this;
-
-        var margin = {top: 20, right: 0, bottom: 0, left: 0};
-        var chartWidth = element.clientWidth;
-        var chartHeight = element.clientHeight - 16;
-
-        var headerHeight = margin.top;
-        var headerColor = defaultHeaderColor;
-        var number_of_headers = 2;
+        const headerHeight = margin.top;
+        const headerColor = defaultHeaderColor;
+        const number_of_headers = 2;
 
         var current_branch;
 
-        var dimensions = queryResponse.fields.dimension_like;
+        const dimensions = queryResponse.fields.dimension_like;
+        // TODO: Convert rest of vars to consts after resolving measures issue
         var measures = queryResponse.fields.measure_like;
         
         var vis_data = convertQueryDatasetToVisData(data, queryResponse);
@@ -458,4 +457,6 @@ looker.plugins.visualizations.add({
         createTreemap(vis_data);
         done();
     }
-});
+};
+
+looker.plugins.visualizations.add(vis);
