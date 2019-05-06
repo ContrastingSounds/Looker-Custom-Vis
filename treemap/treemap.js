@@ -43,7 +43,7 @@ const defaultTheme = `
 const defaultHeaderColor = "orange";
 const defaultCellColor = "AliceBlue";
 
-const global_options = {
+const default_options = {
   showSubHeaders: {
     section: "Data",
     type: "boolean",
@@ -51,12 +51,12 @@ const global_options = {
     default: "true"
   },
   // TODO: Implement Color By Cell Value
-  takeColorFromCellValue: {
-    section: "Data",
-    type: "boolean",
-    label: "Color By Cell Value",
-    default: "true"
-  },
+  // takeColorFromCellValue: {
+  //   section: "Data",
+  //   type: "boolean",
+  //   label: "Color By Cell Value",
+  //   default: "true"
+  // },
   cellColor: {
     section: "Data",
     type: "array",
@@ -104,7 +104,11 @@ const dumpToConsole = function(message, obj) {
     console.log(message, JSON.stringify(obj, null, 2));
 }
 
-const convertQueryDatasetToVisData = function(data, queryResponse) {
+const formatValue = function(number) {
+    return parseInt(number);
+}
+
+const convertQueryDatasetToTreeData = function(data, queryResponse) {
     var vis_data = [];
     data.forEach(d => {
         var row = {};
@@ -136,15 +140,15 @@ const convertQueryDatasetToVisData = function(data, queryResponse) {
     return vis_data;
 }
 
-const getHierarchy = function(queryResponse) {
-    var hierarchy = [];
+const getHierarchyNames = function(queryResponse) {
+    var hierarchy_names = [];
     queryResponse.fields.dimension_like.forEach(d => {
-        hierarchy.push(d.name);
+        hierarchy_names.push(d.name);
     });
-    return hierarchy;
+    return hierarchy_names;
 }
 
-const getMeasures = function(queryResponse) {
+const getMeasureNames = function(queryResponse) {
     var measures = [];
     queryResponse.fields.measure_like.forEach(d => {
         measures.push(d.name);
@@ -153,15 +157,16 @@ const getMeasures = function(queryResponse) {
 }
 
 const getNewConfigOptions = function(dimensions, measures) {
-    new_options = global_options;
+    new_options = default_options;
 
     size_by_options = [];
     for (var i = 0; i < measures.length; i++) {
         option = {};
-        option[measures[i]] = i.toString();
+        // option[measures[i]] = i.toString();
+        option[measures[i].label] = measures[i].name;
         size_by_options.push(option);
     }
-    size_by_options.push({"Count of Rows": "count_of_rows"});
+    size_by_options.push({"Count of Rows (TBD)": "count_of_rows"});
 
     new_options["sizeBy"] = {
         section: "Data",
@@ -178,6 +183,7 @@ const getNewConfigOptions = function(dimensions, measures) {
         option[dimensions[i].label] = dimensions[i].name;
         color_by_options.push(option)
     }
+    color_by_options.push({"Color by Value (TBD)": "color_by_value"});
 
     new_options["colorBy"] = {
         section: "Data",
@@ -192,18 +198,7 @@ const getNewConfigOptions = function(dimensions, measures) {
 }
 
 const vis = {
-    options: {
-      showSubHeaders: {
-        section: "Data",
-        type: "boolean",
-        label: "Show Sub Headers",
-        default: "true"
-      },
-      breadcrumbs: {
-        type: "array",
-        default: [],
-      }
-    },
+    options: default_options,
 
     create: function(element, config) {
         this.style = document.createElement('style');
@@ -235,21 +230,19 @@ const vis = {
         const headerColor = defaultHeaderColor;
         const number_of_headers = 2;
 
-        var current_branch;
-
         const dimensions = queryResponse.fields.dimension_like;
-        // TODO: Convert rest of vars to consts after resolving measures issue
-        var measures = queryResponse.fields.measure_like;
+        const measures = queryResponse.fields.measure_like;
         
-        var vis_data = convertQueryDatasetToVisData(data, queryResponse);
-        var hierarchy = getHierarchy(queryResponse);
-        var measures = getMeasures(queryResponse);
-
         new_options = getNewConfigOptions(dimensions, measures);
         vis.trigger("registerOptions", new_options);
 
-        var colorScale = d3.scaleOrdinal()
-                           .range(config.cellColor);            
+        const vis_data = convertQueryDatasetToTreeData(data, queryResponse);
+        const hierarchy_names = getHierarchyNames(queryResponse);
+        const measure_names = getMeasureNames(queryResponse);
+        const colorScale = d3.scaleOrdinal()
+                           .range(config.cellColor);   
+
+        // var current_branch;         
 
         var treemap = d3.treemap()
             .size([chartWidth, chartHeight])
@@ -265,7 +258,7 @@ const vis = {
             })
             .round(true);
 
-        var updateCurrentBranch = function(branch, keys) {
+        const updateCurrentBranch = function(branch, keys) {
             if (keys.length === 0) {
                 // returning final branch
                 current_branch = branch;
@@ -282,16 +275,16 @@ const vis = {
             };
         }
 
-        var getSize = function(d) {
+        const getSize = function(d) {
             if (config["sizeBy"] == "count_of_rows") {
                 return !d.key ? 1 : 0;
             } else {
-                idx = Number(config["sizeBy"]);
-                return parseFloat(d[measures[idx]]);    
+                let measure = config["sizeBy"];
+                return parseFloat(d[measure]);    
             }
         }
 
-        var getColor = function(d) {
+        const getColor = function(d) {
             if (d.height === 0) {
                 if (config.takeColorFromCellValue) {
                     return d.data[config["colorBy"]];
@@ -305,22 +298,27 @@ const vis = {
             }
         }
 
-        var getCellText = function(d) {
+        const getCellText = function(d) {
             if (d.depth === 0) {
+                display_value = formatValue(d.value);
                 if (config.breadcrumbs.length === 0) {
-                    cell_string = " – Top Level: click on cells to zoom in, or click on this bar to zoom out – "    
+                    cell_string = "Top Level (" + display_value + ") – click on cells to zoom in, or click on this bar to zoom out"; 
                 } else {
-                    cell_string = config.breadcrumbs.join(" – ")
+                    cell_string = config.breadcrumbs.join(" – ") + " (" + display_value + ")";
                 }
                 
             } else if (d.depth < number_of_headers && config.showSubHeaders) {
-                cell_string = d.data.key;
+                display_value = formatValue(d.value);
+                if (typeof d.data.key === 'undefined') {
+                    cell_string = display_value ;
+                } else {
+                    cell_string = d.data.key + " (" + display_value + ")";
+                }
             } else if (d.height === 0) {
                 if (config["sizeBy"] === "count_of_rows") {
-                    cell_string = "";
+                    cell_string = "1";
                 } else {
-                    idx = Number(config["sizeBy"]);
-                    cell_string = d.data.metadata[measures[idx]].rendered;                    
+                    cell_string = d.data.metadata[config["sizeBy"]].rendered;                    
                 }
             } else {
                 cell_string = "";
@@ -329,16 +327,16 @@ const vis = {
             return cell_string
         }
 
-        var getTooltip = function(d) {
+        const getTooltip = function(d) {
             var tiptext = "";
             if (d.height === 0) {
-                for (var prop in hierarchy) {
-                    var metadata = d.data.metadata[hierarchy[prop]];
+                for (var prop in hierarchy_names) {
+                    var metadata = d.data.metadata[hierarchy_names[prop]];
                     tiptext += "<p><em>" + metadata.label + ":</em> " + metadata.rendered + "</p>";
                 }
                 tiptext += '<br>'
                 for (var measure in measures) {
-                    var metadata = d.data.metadata[measures[measure]];
+                    var metadata = d.data.metadata[measure_names[measure]];
                     tiptext += "<p><em>" + metadata.label + ":</em> " + metadata.rendered + "</p>";
                 }
             } else {
@@ -348,7 +346,7 @@ const vis = {
             return tiptext;
         }
 
-        var createTreemap = function(data) {
+        const createTreemap = function(data) {
             var nested_data = d3.nest();
             dimensions.forEach(dim => 
                 nested_data = nested_data.key(d => d[dim.name]));
@@ -364,9 +362,7 @@ const vis = {
                   .sort(function(a, b) {return b.height - a.height || getSize(b) - getSize(a)})
             );
 
-            displayChart(root);
-
-            function displayChart(d) {
+            const displayChart = function(d) {
                 d3.select("#treemapSVG").remove();
 
                 var svg = d3.select("#treemapContainer")
@@ -452,6 +448,8 @@ const vis = {
                     }
                 }
             }
+
+            displayChart(root);
         }
         
         createTreemap(vis_data);
