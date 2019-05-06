@@ -32,10 +32,6 @@ const defaultTheme = `
         line-height: 15px;
     }
 
-    #tooltip span {
-        pointer-events: auto;
-    }
-
     .textdiv {
         font-family: "Open Sans",Helvetica,Arial,sans-serif;
         font-size: 12px;
@@ -111,18 +107,28 @@ const convertQueryDatasetToVisData = function(data, queryResponse) {
     var vis_data = [];
     data.forEach(d => {
         var row = {};
+        var idx = 0;
         row['metadata'] = {};
         for (var [key, value] of Object.entries(d)) {
             row[key] = value.value;
+
+            if (idx < queryResponse.fields.dimension_like.length) {
+                field_label = queryResponse.fields.dimension_like[idx].label_short;
+            } else {
+                field_label = queryResponse.fields.measure_like[idx - queryResponse.fields.dimension_like.length].label_short;
+            }
+
             if (typeof value.rendered !== 'undefined') {
                 var render = value.rendered
             } else {
                 var render = value.value
             }
             row['metadata'][key] = {
+                label: field_label,
                 rendered: render,
                 links: value.links,
             }
+            idx += 1;
         }
         vis_data.push(row);
     });
@@ -303,7 +309,7 @@ looker.plugins.visualizations.add({
         var getCellText = function(d) {
             if (d.depth === 0) {
                 if (config.breadcrumbs.length === 0) {
-                    cell_string = " – Top Level: click on cells to zoom in, this bar to zoom out – "    
+                    cell_string = " – Top Level: click on cells to zoom in, or click on this bar to zoom out – "    
                 } else {
                     cell_string = config.breadcrumbs.join(" – ")
                 }
@@ -324,27 +330,17 @@ looker.plugins.visualizations.add({
             return cell_string
         }
 
-        // TODO: Fix issue with flickering drill down links
         var getTooltip = function(d) {
             var tiptext = "";
             if (d.height === 0) {
                 for (var prop in hierarchy) {
                     var metadata = d.data.metadata[hierarchy[prop]];
-                    tiptext += "<p><em>" + hierarchy[prop] + ":</em> " + d.data[hierarchy[prop]] + "</p>";
-                    for (var link in metadata.links) {
-                        var link_markup = ['<span style="float: right"><a href="', metadata.links[link].url, '">', metadata.links[link].label, '</a></span><br>'].join('')
-                        tiptext += link_markup;
-                    }
+                    tiptext += "<p><em>" + metadata.label + ":</em> " + metadata.rendered + "</p>";
                 }
                 tiptext += '<br>'
-
                 for (var measure in measures) {
                     var metadata = d.data.metadata[measures[measure]];
-                    tiptext += "<p><em>" + measures[measure] + ":</em> " + metadata.rendered + "</p>";
-                    for (var link in metadata.links) {
-                        var link_markup = ['<span style="float: right"><a href="', metadata.links[link].url, '">', metadata.links[link].label, '</a></span><br>'].join('')
-                        tiptext += link_markup;
-                    }
+                    tiptext += "<p><em>" + metadata.label + ":</em> " + metadata.rendered + "</p>";
                 }
             } else {
                 tiptext += d.data.key;
