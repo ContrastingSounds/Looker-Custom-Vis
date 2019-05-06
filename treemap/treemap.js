@@ -438,13 +438,15 @@ const vis = {
                         while (d.depth > 1) {
                             d = d.parent;
                         }
-                        config.breadcrumbs.push(d.data.key);
-                        // zoom down
-                        root = treemap(d3.hierarchy(d.data, d => d.values)
-                            .sum(d => getSize(d))
-                        );
-                        
-                        displayChart(root);
+                        if (typeof d.data.key !== 'undefined') {
+                            config.breadcrumbs.push(d.data.key);
+                            // zoom down
+                            root = treemap(d3.hierarchy(d.data, d => d.values)
+                                .sum(d => getSize(d))
+                            );
+                            
+                            displayChart(root);                            
+                        }
                     }
                 }
             }
