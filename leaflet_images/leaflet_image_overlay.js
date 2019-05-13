@@ -122,9 +122,9 @@ const vis = {
     },
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
-    // console.log(data);
-    // console.log(config);
-    // console.log(element);
+    if (config.dumpData) { dumpToConsole("data: ", data) }
+    if (config.dumpConfig) { dumpToConsole("config: ", config) }
+    if (config.dumpQueryResponse) { dumpToConsole("queryResponse: ", queryResponse) }
 
     var LeafIcon = L.Icon.extend({});
     const chartHeight = element.clientHeight - 16;
@@ -134,9 +134,13 @@ const vis = {
       var scaleLengthY = config.maxY - config.minY;
 
       var trim_top = trim_bottom = config.paddingVertical;
-      var trim_left = trim_right = config.paddingHorizontal;     
+      var trim_left = trim_right = config.paddingHorizontal;
 
+
+      // Create HTML elements and load Leaflet map
+      // Removes map_element if already present
       const map_container = document.getElementById('map_container');
+      map_container.setAttribute("style", "background-color:white");
       var map_element = document.getElementById('map');
       if (map_element) {
           map_container.removeChild(map_element);
@@ -154,6 +158,7 @@ const vis = {
           attributionControl: false,
       });
 
+      // Calculate bounds of the vis – essentially the scale plus padding config
       bl_x = config.minX - (config.maxX * trim_left);
       bl_y = config.minY - (config.maxY * trim_bottom);
       tr_x = config.maxX * (1.0 + trim_right);
@@ -161,11 +166,13 @@ const vis = {
 
       var bounds = [[bl_y, bl_x], [tr_y, tr_x]];
       var image = L.imageOverlay(config.imageURL, bounds).addTo(map);
-
       map.fitBounds(bounds);
 
-      var icons = {};
-
+      // Iterate through all rows and add markers based on marker_type
+      // Current options: 
+      //   marker:   use icon, from URL provided in the data row
+      //   html:     use html code, from string defined in the data row
+      //   default:  if no valid marker_type, use default Leaflet marker
       const placeMarks = function() {
         const max_icon_size = 50;
         for (i = 0; i < data.length; i++) {
@@ -198,7 +205,7 @@ const vis = {
               var coordinates = L.latLng(row.y.value, row.x.value);
               var htmlIcon = L.divIcon({ 
                 className: 'myicon',
-                iconSize: null,
+                iconSize: null,  // required due to Leaflet bug (css will be overwritten without this)
                 html: row.html 
               });
               var pin = L.marker(coordinates, {icon: htmlIcon});
