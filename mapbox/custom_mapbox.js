@@ -121,12 +121,21 @@ const vis = {
         // As an alternative to Looker have a location type,
         // we can use tags (e.g. "geojson") in LookML
         map.on('load', function() {
-
+            let geojson_features = {
+                "type": "FeatureCollection",
+                features: []
+            };
             for (let d = 0; d < dimensions.length; d++) {
                 if (dimensions[d].tags.includes("geojson")) {
 
                     for (let row = 0; row < data.length; row++) {
                         let geojson_value = JSON.parse(data[row][dimensions[d].name].value);
+                        geojson_feature = {
+                            "type": "Feature",
+                            "properties": {},
+                            "geometry": geojson_value
+                        }
+                        geojson_features.features.push(geojson_feature);
                         map.addLayer({
                             "id": dimensions[d].name + "-layer" + d + row,
                             "type": "fill",
@@ -139,10 +148,14 @@ const vis = {
                                 "fill-color": "#ff0000",
                                 "fill-opacity": 0.2
                             }
-                        }); 
-                    }       
+                        });
+                    }              
                 }
             }
+            bounds = geojsonExtent(geojson_features);            
+            map.fitBounds(bounds, {
+                padding: 20
+            });
 
             // https://docs.mapbox.com/mapbox-gl-js/example/3d-buildings/
             // Insert the layer beneath any symbol layer.
@@ -169,26 +182,24 @@ const vis = {
                     // use an 'interpolate' expression to add a smooth transition effect to the
                     // buildings as the user zooms in
                     
-                    'fill-extrusion-height': ["get", "height"],
-                    'fill-extrusion-base': ["get", "min_height"],
+                    // 'fill-extrusion-height': ["get", "height"],
+                    // 'fill-extrusion-base': ["get", "min_height"],
 
-                    // 'fill-extrusion-height': [
-                    // "interpolate", ["linear"], ["zoom"],
-                    //     15, 0,
-                    //     15.05, ["get", "height"]
-                    // ],
-                    // 'fill-extrusion-base': [
-                    // "interpolate", ["linear"], ["zoom"],
-                    //     15, 0,
-                    //     15.05, ["get", "min_height"]
-                    // ],
+                    'fill-extrusion-height': [
+                    "interpolate", ["linear"], ["zoom"],
+                        15, 0,
+                        15.05, ["get", "height"]
+                    ],
+                    'fill-extrusion-base': [
+                    "interpolate", ["linear"], ["zoom"],
+                        15, 0,
+                        15.05, ["get", "min_height"]
+                    ],
 
                     'fill-extrusion-opacity': .6
                 }
             }, labelLayerId);
         });
-
-        // map.fitBounds(geoLayer.getBounds());
 
         done();
     }
