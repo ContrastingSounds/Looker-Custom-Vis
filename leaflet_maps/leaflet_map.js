@@ -1,5 +1,39 @@
+const default_options = {
+  // Map Options
+  mapStyle: {
+    section: "Map",
+    type: "string",
+    label: "Map Style",
+    display: "select",
+    values: [
+      {"Standard": "standard"},
+      {"Watercolour": "watercolour"}
+    ],
+    default: "standard",
+  },
+}
+
+const map_options = {
+    'standard': {
+        'tiles_url': 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        'metadata': {
+            attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors, <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>'
+        }
+    },
+    'watercolour': {
+        'tiles_url': 'https://stamen-tiles-{s}.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.{ext}',
+        'metadata': {
+            attribution: 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a> &mdash; Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            subdomains: 'abcd',
+            minZoom: 1,
+            maxZoom: 16,
+            ext: 'jpg'
+        }
+    }
+}
+
 const vis = {
-    options: {},
+    options: default_options,
 
     create: function(element, config) {
         var csslink  = document.createElement('link');
@@ -49,10 +83,23 @@ const vis = {
 
         var map = L.map('leafletMap');
         
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png?{foo}', {
-            foo: 'bar', 
-            attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors, <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>'
-        }).addTo(map);
+        // L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png?{foo}', {
+        //     foo: 'bar', 
+        //     attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors, <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>'
+        // }).addTo(map);
+
+        // L.tileLayer('https://stamen-tiles-{s}.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.{ext}', {
+        //     attribution: 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a> &mdash; Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        //     subdomains: 'abcd',
+        //     minZoom: 1,
+        //     maxZoom: 16,
+        //     ext: 'jpg'
+        // }).addTo(map);
+
+        L.tileLayer(
+            map_options[config.mapStyle].tiles_url, 
+            map_options[config.mapStyle].metadata
+        ).addTo(map);
 
         // As an alternative to Looker have a location type,
         // we can use tags (e.g. "geojson") in LookML
