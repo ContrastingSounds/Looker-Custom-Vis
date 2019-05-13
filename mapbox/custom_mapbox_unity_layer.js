@@ -1,3 +1,6 @@
+// This version of the script adds all rows for a single dimension 
+// as a single layer in the map
+
 mapboxgl.accessToken = 'pk.eyJ1Ijoiam9ud2FsbHMiLCJhIjoiY2p2aTZsbnh4MDJrbjRibWcxZ2UydXhiayJ9.n25D6UcjxzRQsuKiY5un8A';
 
 const dumpToConsole = function(message, obj) {
@@ -121,23 +124,31 @@ const vis = {
         map.on('load', function() {
             for (let d = 0; d < dimensions.length; d++) {
                 if (dimensions[d].tags.includes("geojson")) {
-
+                    let geojson_layer = {
+                        "type": "geojson",
+                        "data": {
+                            "type": "FeatureCollection",
+                            "features": [],
+                        }
+                    }
                     for (let row = 0; row < data.length; row++) {
                         let geojson_value = JSON.parse(data[row][dimensions[d].name].value);
-                        map.addLayer({
-                            "id": dimensions[d].name + "-layer" + d + row,
-                            "type": "fill",
-                            "source": {
-                                "type": "geojson",
-                                "data": geojson_value,
-                            },
-                            "layout": {},
-                            "paint": {
-                                "fill-color": "#00ff00",
-                                "fill-opacity": 0.4
-                            }
-                        }); 
-                    }       
+                        geojson_layer.data.features.push({
+                            "type": "Feature",
+                            "geometry": geojson_value
+                        });
+                    }
+                    map.addSource(dimensions[d].name + "-source", geojson_layer);
+                    map.addLayer({
+                        "id": dimensions[d].name + "-layer",
+                        "type": "fill",
+                        "source": dimensions[d].name + "-source",
+                        "layout": {},
+                        "paint": {
+                            "fill-color": "#ff0000",
+                            "fill-opacity": 0.4
+                        }
+                    });      
                 }
             }
             console.log(map);
