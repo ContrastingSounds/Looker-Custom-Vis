@@ -209,7 +209,7 @@ const vis = {
               addMarker(row, 41, 25);             
           }
 
-          if (i + 1 = data.length) { done() }
+          if (i + 1 == data.length) { done() }
         }
       }
 
