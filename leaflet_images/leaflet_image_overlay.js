@@ -233,6 +233,7 @@ const vis = {
       }
 
       placeMarks();
+
     }
 
     function loadBackground() {
