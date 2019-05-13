@@ -1,7 +1,3 @@
-const dumpToConsole = function(message, obj) {
-    console.log(message, JSON.stringify(obj, null, 2));
-}
-
 const default_options = {
   // Image Options
   imageURL: {
@@ -105,25 +101,20 @@ const vis = {
   options: default_options,
 
   create: function(element, config) {
-        // Shifted in to the dependencies
-        // Following line was failing in dashboards due to L not being available:
-        //     var LeafIcon = L.Icon.extend({}); 
-
         // Leaflet.js likes the css to be loaded ahead of the js
         // So have loaded both the CSS and Leaflet.js dependency here
         // Rather than using the dependency field on the Admin page
+        var csslink  = document.createElement('link');
+        csslink.rel  = 'stylesheet';
+        csslink.type = 'text/css';
+        csslink.href = 'https://unpkg.com/leaflet@1.5.1/dist/leaflet.css';
+        csslink.crossorigin = "";
+        document.head.appendChild(csslink);
 
-        // var csslink  = document.createElement('link');
-        // csslink.rel  = 'stylesheet';
-        // csslink.type = 'text/css';
-        // csslink.href = 'https://unpkg.com/leaflet@1.5.1/dist/leaflet.css';
-        // csslink.crossorigin = "";
-        // document.head.appendChild(csslink);
-
-        // var scriptlink  = document.createElement('script');
-        // scriptlink.src  = 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js';
-        // scriptlink.crossorigin = "";
-        // document.head.appendChild(scriptlink);
+        var scriptlink  = document.createElement('script');
+        scriptlink.src  = 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js';
+        scriptlink.crossorigin = "";
+        document.head.appendChild(scriptlink);
 
 
         this.container = element.appendChild(document.createElement("div"));
@@ -198,6 +189,10 @@ const vis = {
                 icon_longedge = Math.max(icon_height, icon_width);
                 icon_height = Math.min(1.0, max_icon_size / icon_longedge) * icon_height;
                 icon_width = Math.min(1.0, max_icon_size / icon_longedge) * icon_width;
+
+                icons[row.icon] = {};
+                icons[row.icon]["height"] = icon_height;
+                icons[row.icon]["width"]  = icon_width;
 
                 addMarker(this.metadata, icon_height, icon_width);
                 if (i+1 == data.length) { done(); }
