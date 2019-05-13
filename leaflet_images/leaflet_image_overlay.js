@@ -187,7 +187,8 @@ const vis = {
                 icons[row.icon]["height"] = icon_height;
                 icons[row.icon]["width"]  = icon_width;
 
-                addMarker(this.metadata, icon_height, icon_width)
+                addMarker(this.metadata, icon_height, icon_width);
+                if (i+1 == data.length) { done(); }
               }
               image.metadata = row;
               image.src = row.icon.value;
@@ -206,7 +207,8 @@ const vis = {
 
             default:
               row.icon = default_icon;
-              addMarker(row, 41, 25);             
+              addMarker(row, 41, 25);
+              if (i+1 == data.length) { done(); }          
           }
         }
       }
@@ -245,8 +247,6 @@ const vis = {
     }
 
     loadBackground();
-
-    done();
   }
 }
 
