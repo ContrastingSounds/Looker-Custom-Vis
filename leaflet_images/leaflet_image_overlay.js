@@ -129,7 +129,7 @@ const vis = {
     var LeafIcon = L.Icon.extend({});
     const chartHeight = element.clientHeight - 16;
 
-    function displayVis(scenarioImage, config, data=[], done) {
+    function displayVis(scenarioImage, config, data=[]) {
       var scaleLengthX = config.maxX - config.minX;
       var scaleLengthY = config.maxY - config.minY;
 
@@ -166,7 +166,7 @@ const vis = {
 
       var icons = {};
 
-      const placeMarks = function(done) {
+      const placeMarks = function() {
         const max_icon_size = 50;
         for (i = 0; i < data.length; i++) {
           row = data[i];
@@ -208,8 +208,6 @@ const vis = {
               row.icon = default_icon;
               addMarker(row, 41, 25);             
           }
-
-          if (i + 1 == data.length) { done() }
         }
       }
 
@@ -234,18 +232,18 @@ const vis = {
         marker.addTo(map);
       }
 
-      placeMarks(done);
+      placeMarks();
     }
 
     function loadBackground() {
       let image = new Image();
       image.onload = function() {
-        displayVis(this, config, data, done);
+        displayVis(this, config, data);
       }
       image.src = config.imageURL;
     }
 
-    loadBackground(done);
+    loadBackground();
   }
 }
 
