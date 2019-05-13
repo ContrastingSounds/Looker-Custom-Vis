@@ -55,7 +55,7 @@ const vis = {
                 }                
             }
         }
-        // map.fitBounds(L.geoJSON().getBounds());
+        map.fitBounds(L.geoJSON().getBounds());
 
         done();
     }
