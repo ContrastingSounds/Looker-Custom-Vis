@@ -3,5 +3,11 @@
 Dependencies:
 
 ```
-https://unpkg.com/leaflet@1.5.1/dist/leaflet.js
+https://api.tiles.mapbox.com/mapbox-gl-js/v0.54.0/mapbox-gl.js
+```
+
+Style Files:
+
+```
+https://api.tiles.mapbox.com/mapbox-gl-js/v0.54.0/mapbox-gl.css
 ```
