@@ -25,6 +25,18 @@ const vis = {
         const chartHeight = element.clientHeight - 16;
         const dimensions = queryResponse.fields.dimension_like;
 
+
+        count_of_geojson_dimensions = 0;
+        for (let d = 0; d < dimensions.length; d++) {
+            if (dimensions[d].tags.includes("geojson")) {
+                count_of_geojson_dimensions += 1;               
+            }
+        }
+        if (count_of_geojson_dimensions == 0) {
+          this.addError({title: "No GeoJSON fields", message: "This vis requires a dimension tagged as 'geojson'."});
+          return;
+        }
+
         // Create HTML elements and load Leaflet map
         // Removes map_element if already present
         map_element = document.getElementById('leafletMap');
