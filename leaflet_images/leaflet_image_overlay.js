@@ -245,10 +245,9 @@ const vis = {
     }
 
     loadBackground();
+
+    done();
   }
 }
-
-
-
 
 looker.plugins.visualizations.add(vis);
