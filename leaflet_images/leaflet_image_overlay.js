@@ -1,3 +1,7 @@
+const dumpToConsole = function(message, obj) {
+    console.log(message, JSON.stringify(obj, null, 2));
+}
+
 const default_options = {
   // Image Options
   imageURL: {
@@ -74,6 +78,13 @@ const default_options = {
     display_size: "half",
   },
   // Dev Options
+  debugOutput: {
+    section: "Debug",
+    type: "boolean",
+    label: "vis",
+    default: "false",
+    display_size: "half",
+  },
   dumpData: {
     section: "Debug",
     type: "boolean",
@@ -101,21 +112,12 @@ const vis = {
   options: default_options,
 
   create: function(element, config) {
-        // Leaflet.js likes the css to be loaded ahead of the js
-        // So have loaded both the CSS and Leaflet.js dependency here
-        // Rather than using the dependency field on the Admin page
         var csslink  = document.createElement('link');
         csslink.rel  = 'stylesheet';
         csslink.type = 'text/css';
         csslink.href = 'https://unpkg.com/leaflet@1.5.1/dist/leaflet.css';
         csslink.crossorigin = "";
         document.head.appendChild(csslink);
-
-        var scriptlink  = document.createElement('script');
-        scriptlink.src  = 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js';
-        scriptlink.crossorigin = "";
-        document.head.appendChild(scriptlink);
-
 
         this.container = element.appendChild(document.createElement("div"));
         this.container.id = "map_container";
@@ -173,6 +175,8 @@ const vis = {
       //   marker:   use icon, from URL provided in the data row
       //   html:     use html code, from string defined in the data row
       //   default:  if no valid marker_type, use default Leaflet marker
+      var icons = [];
+
       const placeMarks = function() {
         const max_icon_size = 50;
         for (i = 0; i < data.length; i++) {
@@ -233,9 +237,11 @@ const vis = {
         }
         var coordinates = L.latLng(metadata.y.value, metadata.x.value);
 
-        console.log("L.marker(): coordinates, markerOptions");
-        console.log(coordinates);
-        console.log(markerOptions);
+        if (config.debugOutput) {
+          console.log("L.marker(): coordinates, markerOptions");
+          console.log(coordinates);
+          console.log(markerOptions);          
+        }
         var marker = L.marker(coordinates, markerOptions);
         marker.bindPopup(row["colour"]);
         marker.addTo(map);
