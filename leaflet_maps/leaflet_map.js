@@ -2,9 +2,6 @@ const vis = {
     options: {},
 
     create: function(element, config) {
-        // Leaflet.js likes the css to be loaded ahead of the js
-        // So have loaded both the CSS and Leaflet.js dependency here
-        // Rather than using the dependency field on the Admin page
         var csslink  = document.createElement('link');
         csslink.rel  = 'stylesheet';
         csslink.type = 'text/css';
@@ -28,8 +25,8 @@ const vis = {
         const chartHeight = element.clientHeight - 16;
         const dimensions = queryResponse.fields.dimension_like;
 
-        // Leaflet seems to be very sensitive to finding its div already initialised
-        // The method I found that worked is deleting the div as part of updateAsync()
+        // Create HTML elements and load Leaflet map
+        // Removes map_element if already present
         map_element = document.getElementById('leafletMap');
         if (map_element) {
             map_element.parentNode.removeChild(map_element);

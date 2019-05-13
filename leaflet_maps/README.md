@@ -1,7 +1,7 @@
-# Google Map Vis
+# Leaflet Map Vis
 
 Dependencies:
 
 ```
-https://maps.googleapis.com/maps/api/js?key=YOUR_KEY&callback=drawMap
+https://unpkg.com/leaflet@1.5.1/dist/leaflet.js
 ```

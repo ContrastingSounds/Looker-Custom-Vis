@@ -149,7 +149,6 @@ const vis = {
       }
       map_element = map_container.appendChild(document.createElement("div"));
       map_element.setAttribute("style", "height:" + chartHeight + "px");
-      // map_element.setAttribute("style", "background:#fff");
       map_element.id = "map";
 
       var map = L.map('map', {
