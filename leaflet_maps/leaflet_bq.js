@@ -38,7 +38,7 @@ const vis = {
         map_element.id = "leafletMap";
         map_element.setAttribute("style","height:" + chartHeight + "px");
 
-        var map = L.map('leafletMap').setView([40.71, -74.01], 9);
+        var map = L.map('leafletMap');
         
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png?{foo}', {
             foo: 'bar', 
@@ -47,15 +47,16 @@ const vis = {
 
         // As an alternative to Looker have a location type,
         // we can use tags (e.g. "geojson") in LookML
+        var geoLayer = L.geoJSON().addTo(map);
         for (let d = 0; d < dimensions.length; d++) {
             if (dimensions[d].tags.includes("geojson")) {
                 for (let row = 0; row < data.length; row++) {
                     geojson_value = JSON.parse(data[row][dimensions[d].name].value);
-                    L.geoJSON(geojson_value).addTo(map);
+                    geoLayer.addData(geojson_value);
                 }                
             }
         }
-        map.fitBounds(L.geoJSON().getBounds());
+        map.fitBounds(geoLayer.getBounds());
 
         done();
     }
