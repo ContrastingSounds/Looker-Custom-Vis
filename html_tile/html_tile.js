@@ -5,6 +5,8 @@ https://unpkg.com/liquidjs/dist/liquid.min.js
 
 */
 
+debug = false;
+
 html_tile_style = `
   .html-tile {
     overflow: hidden;
@@ -36,18 +38,17 @@ looker.plugins.visualizations.add({
     // Clear any errors from previous updates.
     this.clearErrors();
 
-    console.log('data:');
-    console.log(JSON.stringify(data, null, 2));
-    console.log('config:');
-    console.log(JSON.stringify(config, null, 2));
-    console.log('queryResponse:');
-    console.log(JSON.stringify(queryResponse, null, 2));
+    if (debug) {
+      console.log('data:');
+      console.log(JSON.stringify(data, null, 2));
+      console.log('config:');
+      console.log(JSON.stringify(config, null, 2));
+      console.log('queryResponse:');
+      console.log(JSON.stringify(queryResponse, null, 2));      
+    }
 
     // Grab the first row of the data.
     var firstRow = data[0];
-
-    console.log('firstRow:');
-    console.log(JSON.stringify(firstRow, null, 2));
 
     var engine = new Liquid();
     tpl = engine.parse(config.html_template);
@@ -57,18 +58,11 @@ looker.plugins.visualizations.add({
       var tag = tpl[j]
       console.log('tag:');
       console.log(JSON.stringify(tag, null, 2));
-      if (tag.type == "value") {
-        raw_name = tag.initial.replace("--", ".");
-        console.log('raw_name:');
-        console.log(raw_name);
-        parameters[tag.initial] = firstRow[raw_name].rendered
+      if (tag.token.type == "output") {
+        raw_name = tag.token.value.replace("%", "."); 
+        parameters[tag.token.value] = firstRow[raw_name].rendered
       }
     }
-
-    console.log('tpl:');
-    console.log(JSON.stringify(tpl, null, 2));
-    console.log('parameters:');
-    console.log(JSON.stringify(parameters, null, 2));
 
     this.style.innerHTML = html_tile_style;
     engine
