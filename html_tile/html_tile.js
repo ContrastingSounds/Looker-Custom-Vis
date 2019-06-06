@@ -46,17 +46,29 @@ looker.plugins.visualizations.add({
     // Grab the first row of the data.
     var firstRow = data[0];
 
+    console.log('firstRow:');
+    console.log(JSON.stringify(firstRow, null, 2));
+
     var engine = new Liquid();
     tpl = engine.parse(config.html_template);
 
     parameters = {};
     for (var j = 0; j < tpl.length; j++) {
       var tag = tpl[j]
+      console.log('tag:');
+      console.log(JSON.stringify(tag, null, 2));
       if (tag.type == "value") {
         raw_name = tag.initial.replace("--", ".");
+        console.log('raw_name:');
+        console.log(raw_name);
         parameters[tag.initial] = firstRow[raw_name].rendered
       }
     }
+
+    console.log('tpl:');
+    console.log(JSON.stringify(tpl, null, 2));
+    console.log('parameters:');
+    console.log(JSON.stringify(parameters, null, 2));
 
     this.style.innerHTML = html_tile_style;
     engine
