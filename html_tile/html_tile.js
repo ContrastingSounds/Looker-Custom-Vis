@@ -36,11 +36,11 @@ looker.plugins.visualizations.add({
     // Clear any errors from previous updates.
     this.clearErrors();
 
-    console.log('data':);
+    console.log('data:');
     console.log(JSON.stringify(data, null, 2));
-    console.log('config':);
+    console.log('config:');
     console.log(JSON.stringify(config, null, 2));
-    console.log('queryResponse':);
+    console.log('queryResponse:');
     console.log(JSON.stringify(queryResponse, null, 2));
 
     // Grab the first row of the data.
