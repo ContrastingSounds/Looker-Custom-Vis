@@ -53,11 +53,14 @@ looker.plugins.visualizations.add({
     var engine = new Liquid();
     tpl = engine.parse(config.html_template);
 
+    if (debug) {
+      console.log('tpl:');
+      console.log(JSON.stringify(tpl, null, 2));
+    }
+
     parameters = {};
     for (var j = 0; j < tpl.length; j++) {
       var tag = tpl[j]
-      console.log('tag:');
-      console.log(JSON.stringify(tag, null, 2));
       if (tag.token.type == "output") {
         raw_name = tag.token.value.replace("%", "."); 
         parameters[tag.token.value] = firstRow[raw_name].rendered
