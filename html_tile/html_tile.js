@@ -19,7 +19,7 @@ looker.plugins.visualizations.add({
   options: {
     html_template: {
       type: "string",
-      label: "HTML Template",
+      label: "Template Syntax: {{ view_name%field_name }}",
       display: "text",
       default: "No HTML has been configured yet",
     }
