@@ -5,7 +5,7 @@ https://unpkg.com/liquidjs/dist/liquid.min.js
 
 */
 
-debug = false;
+debug = true;
 
 html_tile_style = `
   .html-tile {
@@ -53,18 +53,18 @@ looker.plugins.visualizations.add({
     var engine = new Liquid();
     tpl = engine.parse(config.html_template);
 
-    if (debug) {
-      console.log('tpl:');
-      console.log(JSON.stringify(tpl, null, 2));
-    }
-
     parameters = {};
     for (var j = 0; j < tpl.length; j++) {
       var tag = tpl[j]
       if (tag.token.type == "output") {
         raw_name = tag.token.value.replace("%", "."); 
-        parameters[tag.token.value] = firstRow[raw_name].rendered
+        parameters[tag.token.value] = firstRow[raw_name].rendered || firstRow[raw_name].value
       }
+    }
+
+    if (debug) {
+      console.log('parameters:');
+      console.log(JSON.stringify(parameters, null, 2));
     }
 
     this.style.innerHTML = html_tile_style;
