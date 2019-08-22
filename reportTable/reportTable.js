@@ -2,26 +2,26 @@
 
 debug = true;
 
-printTableStyle = `
-  table.printTable {
+reportTableStyle = `
+  table.reportTable {
     font-family: Open Sans,Helvetica,Arial,sans-serif;
     font-size: 12px;   
   }
 
-  table.printTable td, table.printTable th {
+  table.reportTable td, table.reportTable th {
   }
 
-  table.printTable thead {
+  table.reportTable thead {
     background: #E60000;
     border-bottom: 1px solid #444444;
   }
 
-  table.printTable thead th {
+  table.reportTable thead th {
     font-weight: normal;
     color: #FFFFFF;
   }
 
-  table.printTable thead th:first-child {
+  table.reportTable thead th:first-child {
     border-left: none;
   }
 `
@@ -78,55 +78,43 @@ const getTableStructure = function(queryResponse) {
   return columns
 }
 
-
-const buildHeader = function(tableStructure) {
-  
-  headerColumns = ''
+const buildHeader = function(table, tableStructure) {
+  thead = table.createTHead();
+  headerRow = thead.insertRow();
   for (var i = 0; i < columns.length; i++) {
-    headerColumns += '<th>' + columns[i] + '</th>'
+    th = document.createElement('th');
+    text = document.createTextNode(columns[i])
+    th.appendChild(text)
+    headerRow.appendChild(th);
   }
-
-  headerHtml = '<thead><tr>'
-    + headerColumns
-    + '</tr></thead>'
-
-  return headerHtml
 }
 
-
-const buildRows = function(data, tableStructure) {
-  
-  bodyRows = '';
-  
+const buildRows = function(data, table, tableStructure) {
   for (var i = 0; i < data.length; i++) {
-    bodyRow = '<tr>';
+    bodyRow = table.insertRow();
     for (var j = 0; j < tableStructure.length; j++) {
+      cell = bodyRow.insertCell();
       if (typeof data[i][tableStructure[j]].rendered == 'undefined') {
-        cellValue = data[i][tableStructure[j]].value
-      } else {
-        cellValue = data[i][tableStructure[j]].rendered
-      }
-      bodyRow += '<td>' + cellValue + '</td>'
-    }
-    bodyRow += '</tr>';
-    
-    bodyRows += bodyRow
-  }
+        text = document.createTextNode(data[i][tableStructure[j]].value)
 
-  return bodyRows
+      } else {
+        text = document.createTextNode(cellValue = data[i][tableStructure[j]].rendered)
+      }
+      cell.appendChild(text)
+    }
+  }
 }
 
 
 const buildTable = function(data, tableStructure) {
-  
-  tableHtml = '<table class="printTable">'
-   + buildHeader(tableStructure)
-   + '<tbody>'
-   + buildRows(data, tableStructure)
-   + '</tbody>'
-   + '</table>'
+   table = document.createElement('table');
+   table.id = 'reportTable';
+   table.className = 'reportTable';
 
-   return tableHtml
+   buildHeader(table, tableStructure);
+   buildRows(data, table, tableStructure);
+
+   document.getElementById('tableContainer').appendChild(table);
 }
 
 
@@ -146,14 +134,20 @@ looker.plugins.visualizations.add({
     this.style = document.createElement('style')
     document.head.appendChild(this.style)
 
-    // Create a container element to let us center the text.
+    // Create a container element to hold the vis
     this.container = element.appendChild(document.createElement("div"));
-    this.container.className = "printTable";
+    this.container.id = 'tableContainer';
   },
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
     // Clear any errors from previous updates.
     this.clearErrors();
+
+    try {
+      var elem = document.querySelector('#reportTable');
+      elem.parentNode.removeChild(elem);  
+    } catch(e) {}
+    
 
     if (debug) {
       // console.log('data:');
@@ -177,8 +171,8 @@ looker.plugins.visualizations.add({
     new_options = getNewConfigOptions(config, tableStructure);
     this.trigger("registerOptions", new_options);
 
-    this.style.innerHTML = printTableStyle;
-    this.container.innerHTML = buildTable(data, tableStructure);
+    this.style.innerHTML = reportTableStyle;
+    buildTable(data, tableStructure);
 
     done();
   }
