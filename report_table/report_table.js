@@ -177,7 +177,7 @@ const options = {
     section: 'Plot',
     type: 'boolean',
   },
-}
+};
 
 class GlobalConfig {
   constructor() {
@@ -288,18 +288,6 @@ class AgData {
   }
 }
 
-const adjustFonts = () => {
-  const { config } = globalConfig;
-
-  if ('fontFamily' in config) {
-    const mainDiv = document.getElementById('ag-grid-vis');
-    mainDiv.style.fontFamily = config.fontFamily;
-  }
-
-  if ('rowHeight' in config) {
-    gridOptions.rowHeight = config.rowHeight;
-  }
-};
 
 //
 // Display-related constants and functions
@@ -1235,7 +1223,6 @@ const gridOptions = {
   groupDefaultExpanded: -1,
   groupRowAggNodes,
   onFirstDataRendered: setColumns,
-  onRowGroupOpened: adjustFonts,
   onSortChanged: sortChanged,
   rowSelection: 'multiple',
   suppressAggFuncInHeader: true,
@@ -1296,26 +1283,26 @@ looker.plugins.visualizations.add({
 
     const { fields } = queryResponse;
     const { dimensions, measures, pivots, table_calculations: tableCalcs } = fields;
-    if (dimensions.length === 0) {
-      this.addError({
-        message: 'This chart requires dimensions.',
-        title: 'No Dimensions',
-      });
-      return;
-    }
+    // if (dimensions.length === 0) {
+    //   this.addError({
+    //     message: 'This chart requires dimensions.',
+    //     title: 'No Dimensions',
+    //   });
+    //   return;
+    // }
 
-    if (!_.isEmpty(pivots) && (_.isEmpty(measures) && _.isEmpty(tableCalcs))) {
-      this.addError({
-        message: 'Add a measure or table calculation to pivot on.',
-        title: 'Empty Pivot(s)',
-      });
-      return;
-    }
+    // if (!_.isEmpty(pivots) && (_.isEmpty(measures) && _.isEmpty(tableCalcs))) {
+    //   this.addError({
+    //     message: 'Add a measure or table calculation to pivot on.',
+    //     title: 'Empty Pivot(s)',
+    //   });
+    //   return;
+    // }
 
-    updateTheme(this.grid.classList, config.theme);
+    // updateTheme(this.grid.classList, config.theme);
 
     // Gets a range for use by conditional formatting.
-    globalConfig.range = calculateRange(data, queryResponse, config);
+    // globalConfig.range = calculateRange(data, queryResponse, config);
     globalConfig.config = config;
 
     // Manipulates Looker's queryResponse into a format suitable for ag-grid.
@@ -1330,11 +1317,10 @@ looker.plugins.visualizations.add({
 
     gridOptions.api.setRowData(this.agData.formattedData);
 
-    addPivotLabels();
+    // addPivotLabels();
 
     autoSize();
-    setPivotHeaders();
-    adjustFonts();
+    // setPivotHeaders(); 
 
     done();
   },
