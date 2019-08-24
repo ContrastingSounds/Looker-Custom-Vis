@@ -1182,19 +1182,6 @@ const refreshColumns = details => {
   }
 };
 
-const setPivotHeaders = () => {
-  const pivotHeaders = document.getElementsByClassName('pivotHeader');
-  if (!_.isEmpty(pivotHeaders)) {
-    const parentRow = pivotHeaders[0].parentNode.parentNode.parentNode;
-    parentRow.classList.add('pivotHeaderRow');
-
-    // Set height according to how many pivots are present:
-    const numPivots = globalConfig.queryResponse.fields.pivots.length;
-    // Magic number corresponding to .ag-header-group-cell in CSS file.
-    gridOptions.api.setGroupHeaderHeight(26 * numPivots);
-  }
-};
-
 // This is called from updateAsync once we are ready to display (prevents early
 // displaying before CSS files have been downloaded and applied).
 const hideOverlay = (vis, element, config) => {
@@ -1320,7 +1307,6 @@ looker.plugins.visualizations.add({
     // addPivotLabels();
 
     autoSize();
-    // setPivotHeaders(); 
 
     done();
   },
