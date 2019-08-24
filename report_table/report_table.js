@@ -987,27 +987,6 @@ const addOptionAlignments = fields => {
   });
 };
 
-const addOptionFontFormats = fields => {
-  fields.forEach(field => {
-    const { label, name } = field;
-    const fontFormat = `fontFormat_${name}`;
-    options[fontFormat] = {
-      default: 'none',
-      display: 'select',
-      label: `Format: ${label}`,
-      section: 'Config',
-      type: 'string',
-      values: [
-        { 'None': 'none' },
-        { 'Bold': 'bold' },
-        { 'Italic': 'italic' },
-        { 'Underline': 'underline' },
-        { 'Strikethrough': 'strikethrough' },
-      ],
-    };
-  });
-};
-
 // Once columns are available to ag-grid, we can update the options hash/config
 // and add/remove custom configurations.
 // This triggers two events on the visualization object:
@@ -1018,7 +997,6 @@ const modifyOptions = (vis, config) => {
 
   addOptionCustomLabels(measureLike);
   addOptionAlignments(measureLike);
-  addOptionFontFormats(measureLike);
 
   vis.trigger('registerOptions', options);
 };
