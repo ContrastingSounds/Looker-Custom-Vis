@@ -304,20 +304,6 @@ const autoSize = () => {
   }
 };
 
-// Removes the current stylesheet in favor of user-selected theme in config.
-const updateTheme = (classList, theme) => {
-  const currentClass = _.find(classList, klass => {
-    const match = klass.match('ag-theme');
-    if (match !== null) {
-      return match.input;
-    }
-    return null;
-  });
-  if (currentClass !== null) {
-    classList.remove(currentClass);
-  }
-  classList.add(theme);
-};
 
 // All of the currently supported ag-grid stylesheets.
 const themes = [
@@ -1268,10 +1254,6 @@ looker.plugins.visualizations.add({
     //   return;
     // }
 
-    // updateTheme(this.grid.classList, config.theme);
-
-    // Gets a range for use by conditional formatting.
-    // globalConfig.range = calculateRange(data, queryResponse, config);
     globalConfig.config = config;
 
     // Manipulates Looker's queryResponse into a format suitable for ag-grid.
