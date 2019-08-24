@@ -1143,24 +1143,6 @@ const modifyOptions = (vis, config) => {
   vis.trigger('registerOptions', options);
 };
 
-const addPivotLabels = () => {
-  if (!globalConfig.hasPivot) { return; }
-  const { config, queryResponse } = globalConfig;
-  if (!('showRowNumbers' in config)) { return; }
-  const pivots = _.map(queryResponse.fields.pivots, pivot => headerName(pivot, config));
-  const labelDivs = document.getElementsByClassName('ag-header-group-cell-label');
-  const titleDiv = labelDivs[labelDivs.length - 1];
-  if (!_.isUndefined(titleDiv)) {
-    titleDiv.classList.add('pivotHeaderNameContainer');
-    _.forEach(pivots, pivot => {
-      const pivotDiv = document.createElement('div');
-      pivotDiv.innerHTML = `${pivot}:`;
-      pivotDiv.classList.add('pivotHeaderName');
-      pivotDiv.style.float = 'right';
-      titleDiv.appendChild(pivotDiv);
-    });
-  }
-};
 
 const setColumns = () => {
   gridOptions.api.setColumnDefs(globalConfig.formattedColumns);
@@ -1303,8 +1285,6 @@ looker.plugins.visualizations.add({
     globalConfig.agData = this.agData;
 
     gridOptions.api.setRowData(this.agData.formattedData);
-
-    // addPivotLabels();
 
     autoSize();
 
