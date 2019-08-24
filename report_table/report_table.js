@@ -1008,110 +1008,6 @@ const addOptionFontFormats = fields => {
   });
 };
 
-const updateColorConfig = (vis, config) => {
-  const originalMidColor = {
-    display: 'color',
-    display_size: 'third',
-    label: 'Middle',
-    order: 7,
-    section: 'Formatting',
-    type: 'string',
-  };
-  // Automatically set the colors to defaults when selected.
-  if ('formattingPalette' in config && config.formattingPalette !== 'custom') {
-    let colors;
-    switch (config.formattingPalette) {
-      case 'red_yellow_green':
-        if (!('midColor' in options)) { options.midColor = originalMidColor; }
-        colors = [
-          { lowColor: defaultColors.red },
-          { midColor: defaultColors.yellow },
-          { highColor: defaultColors.green },
-        ];
-        break;
-      case 'red_white_green':
-        if (!('midColor' in options)) { options.midColor = originalMidColor; }
-        colors = [
-          { lowColor: defaultColors.red },
-          { midColor: defaultColors.white },
-          { highColor: defaultColors.green },
-        ];
-        break;
-      case 'red_white':
-        if ('midColor' in options) { delete(options.midColor); }
-        colors = [
-          { lowColor: defaultColors.red },
-          { highColor: defaultColors.white },
-        ];
-        break;
-      case 'white_green':
-        if ('midColor' in options) { delete(options.midColor); }
-        colors = [
-          { lowColor: defaultColors.white },
-          { highColor: defaultColors.green },
-        ];
-        break;
-    }
-    _.forEach(colors, color => vis.trigger('updateConfig', [color]));
-  }
-
-  // Flip the labels accordingly.
-  if (config.formattingStyle === 'high_to_low') {
-    options.lowColor.label = 'High';
-    options.highColor.label = 'Low';
-  } else {
-    options.lowColor.label = 'Low';
-    options.highColor.label = 'High';
-  }
-};
-
-// Decide which columns will be getting conditional formatting applied.
-const selectFormattedFields = (fields, config) => {
-  if (config.applyTo === 'select_fields') {
-    fields.forEach(field => {
-      const { label, name } = field;
-      const id = `selectedField_${name}`;
-      options[id] = {
-        label,
-        default: 'false',
-        section: 'Formatting',
-        type: 'boolean',
-      };
-    });
-    fields.forEach(field => {
-      const { name } = field;
-      if (config[`selectedField_${name}`] === true) {
-        globalConfig.addSelectedField(name);
-      } else {
-        globalConfig.removeSelectedField(name);
-      }
-    });
-  } else if (config.applyTo === 'all_numeric_fields') {
-    fields.forEach(field => {
-      const { name } = field;
-      const id = `selectedField_${name}`;
-      if (id in options) { delete(options[id]); }
-    });
-  }
-};
-
-const setupConditionalFormatting = (vis, config, measureLike) => {
-  updateColorConfig(vis, config);
-  selectFormattedFields(measureLike, config);
-
-  if ('enableConditionalFormatting' in config) {
-    options.perColumnRange.hidden = !config.enableConditionalFormatting;
-  }
-
-  if ('formattingPalette' in config) {
-    const showColors = config.formattingPalette === 'custom';
-    options.lowColor.hidden = !showColors;
-    if ('midColor' in options) { options.midColor.hidden = !showColors; }
-    options.highColor.hidden = !showColors;
-  }
-};
-
-
 // Once columns are available to ag-grid, we can update the options hash/config
 // and add/remove custom configurations.
 // This triggers two events on the visualization object:
@@ -1123,8 +1019,6 @@ const modifyOptions = (vis, config) => {
   addOptionCustomLabels(measureLike);
   addOptionAlignments(measureLike);
   addOptionFontFormats(measureLike);
-
-  setupConditionalFormatting(vis, config, measureLike);
 
   vis.trigger('registerOptions', options);
 };
@@ -1238,21 +1132,6 @@ looker.plugins.visualizations.add({
 
     const { fields } = queryResponse;
     const { dimensions, measures, pivots, table_calculations: tableCalcs } = fields;
-    // if (dimensions.length === 0) {
-    //   this.addError({
-    //     message: 'This chart requires dimensions.',
-    //     title: 'No Dimensions',
-    //   });
-    //   return;
-    // }
-
-    // if (!_.isEmpty(pivots) && (_.isEmpty(measures) && _.isEmpty(tableCalcs))) {
-    //   this.addError({
-    //     message: 'Add a measure or table calculation to pivot on.',
-    //     title: 'Empty Pivot(s)',
-    //   });
-    //   return;
-    // }
 
     globalConfig.config = config;
 
