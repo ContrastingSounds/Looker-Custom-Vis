@@ -1,0 +1,26 @@
+table.reportTable {
+  font-family: Open Sans,Helvetica,Arial,sans-serif;
+  font-size: 12px;   
+  width: 100%;
+}
+
+table.reportTable th {
+}
+
+table.reportTable thead {
+  background: #E60000;
+  border-bottom: 1px solid #444444;
+}
+
+table.reportTable thead th {
+  font-weight: normal;
+  color: #FFFFFF;
+}
+
+table.reportTable thead th:first-child {
+  border-left: none;
+}
+
+table.reportTable td {
+  background: #FFFFFF;
+}
