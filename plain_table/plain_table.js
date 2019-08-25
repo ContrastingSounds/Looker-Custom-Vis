@@ -26,7 +26,6 @@ const options = {
 
 
 const getNewConfigOptions = function(config, fields) {
-  console.log('getNewConfigOptions headers', config.headers);
   newOptions = options;
 
   header_array = [{
@@ -58,13 +57,12 @@ const getNewConfigOptions = function(config, fields) {
       order: i,
     }
   }
-  console.log('newOptions:', newOptions)
   return newOptions
 }
 
 
-const getTableStructure_new = function(config, fields) {
-  tableStructure_new = [
+const getTableStructure = function(config, fields) {
+  tableStructure = [
     {
       group_name: 'ungrouped_dimensions',
       display_name: '',
@@ -79,11 +77,11 @@ const getTableStructure_new = function(config, fields) {
         display_name: config.headers[h],
         fields: []
       }
-      tableStructure_new.push(header_group)
+      tableStructure.push(header_group)
     }
   }
 
-  tableStructure_new.push({
+  tableStructure.push({
     group_name: 'ungrouped_metrics',
     display_name: '',
     fields: [],
@@ -97,23 +95,24 @@ const getTableStructure_new = function(config, fields) {
       label = fields[f].label_short
     }
 
+    styles = [];
     if (fields[f].is_numeric) {
-      justify = 'right'
+      styles.push('right')
     } else {
-      justify = 'left'
+      styles.push('left')
     }
 
     field_definition = {
       name: fields[f].name,
       display_name: label,
-      justify: justify 
+      styles: styles 
     }
 
     found = false;
     if (typeof config['header|' + f] !== 'undefined') {
-      for (let g = 0; g < tableStructure_new.length; g++) {
-        if (config['header|' + f] === tableStructure_new[g].group_name) {
-          tableStructure_new[g].fields.push(field_definition);
+      for (let g = 0; g < tableStructure.length; g++) {
+        if (config['header|' + f] === tableStructure[g].group_name) {
+          tableStructure[g].fields.push(field_definition);
           found = true;
           break;
         }
@@ -121,18 +120,18 @@ const getTableStructure_new = function(config, fields) {
     }
     if (!found) {
       if (fields[f].category == 'dimension' || !fields[f].measure) {
-        tableStructure_new[0].fields.push(field_definition)
+        tableStructure[0].fields.push(field_definition)
       } else {
-        tableStructure_new[tableStructure_new.length-1].fields.push(field_definition)
+        tableStructure[tableStructure.length-1].fields.push(field_definition)
       }
     }
   }
 
-  return tableStructure_new
+  return tableStructure
 }
 
 
-const buildHeader_new = function(table, tableStructure) {
+const buildHeader = function(table, tableStructure) {
   thead = table.createTHead();
   headerGroups = thead.insertRow();
   if (tableStructure.length > 2) {
@@ -140,6 +139,7 @@ const buildHeader_new = function(table, tableStructure) {
         if (tableStructure[i].fields.length > 0) {
         th = document.createElement('th');
         th.setAttribute('colspan', tableStructure[i].fields.length);
+        th.classList.add('primary')
         text = document.createTextNode(tableStructure[i].display_name);
         th.appendChild(text);
         headerGroups.appendChild(th);      
@@ -152,43 +152,107 @@ const buildHeader_new = function(table, tableStructure) {
   for (var i = 0; i < tableStructure.length; i++) {
     for (var j = 0; j < tableStructure[i].fields.length; j++) {
       th = document.createElement('th');
-      th.setAttribute('style', 'background: #555555');
       th.setAttribute('width', col_width  );
-      text = document.createTextNode(tableStructure[i].fields[j].display_name)
-      th.appendChild(text)
+      th.classList.add('secondary');
+      th.classList.add(tableStructure[i].fields[j].styles);
+      text = document.createTextNode(tableStructure[i].fields[j].display_name);
+      th.appendChild(text);
       headerRow.appendChild(th);
     }
   }
 }
 
 
-const buildRows_new = function(data, table, tableStructure) {
-  for (var i = 0; i < data.length; i++) {
+const buildFooter = function(table, rows, cols, rowLimit) {
+  if (rows > rowLimit) {
+    excess = rows - rowLimit;
+    tfoot = table.createTFoot();
+    footer_comments = tfoot.insertRow();
+    td = document.createElement('td');
+    td.className = 'excess-rows'
+    td.setAttribute('colspan', cols);
+    text = document.createTextNode('NOTE: This table has an additional ' + excess + ' rows.');
+    td.appendChild(text);
+    footer_comments.appendChild(td);
+  }
+}
+
+
+const buildRows = function(data, table, tableStructure, rowLimit) {
+  rows_to_render = Math.min(rowLimit, data.length);
+  dims = tableStructure[0].fields;
+
+  rowspan_values = [[]];
+  span_tracker = [];
+  for (let i = 0; i < dims.length; i++) {
+    rowspan_values[0].push(1);
+    span_tracker.push(1);
+  }
+  console.log('rows_to_render', rows_to_render);
+  console.log('starting rowspan_values', rowspan_values);
+  console.log('starting span_tracker values', span_tracker);
+
+
+  for (let i = rows_to_render-1; i >= 0; i--) {
+    row_index = rows_to_render - 1 - i;
+    rowspan_values[row_index] = [];
+    for (let j = 0; j < dims.length; j++) {
+      if (i > 0 && data[i][dims[j].name].value == data[i-1][dims[j].name].value) {
+        rowspan_values[row_index][j] = -1;
+        span_tracker[j] += 1;
+      } else {
+        rowspan_values[row_index][j] = span_tracker[j];
+        span_tracker[j] = 1;
+      }
+    }
+  }
+  rowspan_values.reverse();
+  console.log('reversed', rowspan_values);
+
+
+  for (var i = 0; i < rows_to_render; i++) {
     bodyRow = table.insertRow();
     for (var j = 0; j < tableStructure.length; j++) {
       for (var k = 0; k < tableStructure[j].fields.length; k++) {
-        cell = bodyRow.insertCell();
-        if (typeof data[i][tableStructure[j].fields[k].name].rendered == 'undefined') {
-          text = document.createTextNode(data[i][tableStructure[j].fields[k].name].value)
-        } else {
-          text = document.createTextNode(cellValue = data[i][tableStructure[j].fields[k].name].rendered)
+        if (j == 0 ) {
+          spanner = rowspan_values[i][k] 
+        } else { 
+          spanner = 1 
         }
-        cell.appendChild(text)
+
+        if (spanner == -1) {
+          continue;
+        } else {
+          cellValue = data[i][tableStructure[j].fields[k].name];
+          styles = tableStructure[j].fields[k].styles;
+          cell = bodyRow.insertCell();
+
+          if (typeof cellValue.rendered == 'undefined') {
+            text = document.createTextNode(cellValue.value)
+          } else {
+            text = document.createTextNode(cellValue.rendered)
+          }
+
+          cell.classList.add(styles);
+          cell.setAttribute('rowspan', spanner)
+          cell.appendChild(text)          
+        }
       }
     }
   }
 }
 
 
-const buildTable_new = function(data, tableStructure) {
-   table = document.createElement('table');
-   table.id = 'reportTable_new';
-   table.className = 'reportTable';
+const buildTable = function(data, tableStructure, rows, cols, rowLimit) {
+  table = document.createElement('table');
+  table.id = 'reportTable_new';
+  table.className = 'reportTable';
 
-   buildHeader_new(table, tableStructure);
-   buildRows_new(data, table, tableStructure);
+  buildHeader(table, tableStructure);
+  buildRows(data, table, tableStructure, rowLimit);
+  buildFooter(table, rows, cols, rowLimit);
 
-   document.getElementById('tableContainer').appendChild(table);
+  document.getElementById('tableContainer').appendChild(table);
 }
 
 
@@ -236,19 +300,16 @@ looker.plugins.visualizations.add({
       console.log(JSON.stringify(queryResponse, null, 2));      
     }
 
+    var tableHeight = chartHeight = element.clientHeight - 16;
+    var rowLimit = parseInt(tableHeight / 25);
     var fields = queryResponse.fields.dimension_like.concat(queryResponse.fields.measure_like)
 
-    for (var i = 0; i < fields.length; i++) {
-      console.log(fields[i].name);
-    }
-
-    tableStructure_new = getTableStructure_new(config, fields);
-    console.log('tableStructure_new:', JSON.stringify(tableStructure_new, null, 2));
+    tableStructure = getTableStructure(config, fields);
 
     new_options = getNewConfigOptions(config, fields);
     this.trigger("registerOptions", new_options);
 
-    buildTable_new(data, tableStructure_new);
+    buildTable(data, tableStructure, data.length, fields.length, rowLimit);
     
     done();
   }

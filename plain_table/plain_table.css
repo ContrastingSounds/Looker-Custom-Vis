@@ -2,19 +2,14 @@ table.reportTable {
   font-family: Open Sans,Helvetica,Arial,sans-serif;
   font-size: 12px;   
   width: 100%;
+  padding: 5px;
 }
 
 table.reportTable th {
 }
 
 table.reportTable thead {
-  background: #E60000;
   border-bottom: 1px solid #444444;
-}
-
-table.reportTable thead th {
-  font-weight: normal;
-  color: #FFFFFF;
 }
 
 table.reportTable thead th:first-child {
@@ -22,6 +17,34 @@ table.reportTable thead th:first-child {
 }
 
 table.reportTable td {
+  vertical-align: super;
   background: #FFFFFF;
+}
+
+.primary {
+  background: #E60000;
+  font-weight: normal;
+  color: #FFFFFF;
+}
+
+.secondary {
+  background: #777777;
+  font-weight: normal;
+  color: #FFFFFF;
+}
+
+.left {
+  text-align: left;
+}
+
+.right {
+  text-align: right;
+}
+
+.excess-rows {
+  text-align: right;
+  font-weight: bold;
+  background: #777777;
+  color: #555555;
 }
 
