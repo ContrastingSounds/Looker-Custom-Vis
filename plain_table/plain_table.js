@@ -12,7 +12,8 @@ const addCSS = link => {
 };
 
 const loadStylesheets = () => {
-  addCSS('https://storage.googleapis.com/media-jw-test-environment/vis/plain_table.css');
+  // addCSS('https://storage.googleapis.com/media-jw-test-environment/vis/plain_table.css');
+  addCSS('https://jwtest.ngrok.io/plain_table/plain_table.css');
 };
 
 const options = {
@@ -41,27 +42,36 @@ const getNewConfigOptions = function(config, fields) {
   }
 
   for (var i = 0; i < fields.length; i++) {
-    newOptions['header|' + i] = {
-      section: "Data",
+    newOptions['label|' + i] = {
+      section: "Columns",
       type: "string",
-      display: "select",
-      label: fields[i].name,
-      values: header_array,
-      order: i,
+      label: fields[i].label_short,
+      order: i * 10,
     }
 
-    newOptions['label|' + i] = {
-      section: "Labels",
+    newOptions['header|' + i] = {
+      section: "Columns",
       type: "string",
-      label: fields[i].name,
-      order: i,
+      display: "select",
+      label: '', // fields[i].name,
+      values: header_array,
+      order: i * 10 + 1,
     }
 
     newOptions['conditional|' + i] = {
-      section: "Formatting",
+      section: "Columns",
       type: "boolean",
-      label: fields[i].name,
-      order: i,
+      label: 'Good/Bad', // fields[i].name,
+      display_size: 'half',
+      order: i * 10 + 2,
+    }
+
+    newOptions['target_achieved|' + i] = {
+      section: "Columns",
+      type: "boolean",
+      label: 'Target', // fields[i].name,
+      display_size: 'half',
+      order: i * 10 + 3,
     }
 
   }
@@ -142,10 +152,11 @@ const getTableStructure = function(config, fields) {
 
 const buildHeader = function(table, tableStructure, cols) {
   thead = table.createTHead();
-  headerGroups = thead.insertRow();
-  col_width = parseInt  (100 / cols) + '%';
-  console.log('col_width', col_width)
+
   if (tableStructure.length > 2) {
+    headerGroups = thead.insertRow();
+    col_width = parseInt  (100 / cols) + '%';
+    console.log('col_width', col_width)
     for (var i = 0; i < tableStructure.length; i++) {
         if (tableStructure[i].fields.length > 0) {
         th = document.createElement('th');
@@ -239,9 +250,14 @@ const buildRows = function(data, table, tableStructure, rowLimit, config) {
           cell = bodyRow.insertCell();
 
           if (typeof cellValue.rendered == 'undefined') {
-            text = document.createTextNode(cellValue.value)
+            text = cellValue.value
           } else {
-            text = document.createTextNode(cellValue.rendered)
+            text = cellValue.rendered
+          }
+
+          if (cellValue.value == 0) {
+            text = '-';
+            cell.classList.add('zero')
           }
 
           if (typeof config[ 'conditional|' + field.original_position ] !== 'undefined') {
@@ -254,9 +270,19 @@ const buildRows = function(data, table, tableStructure, rowLimit, config) {
             }
           }
 
+          if (typeof config[ 'target_achieved|' + field.original_position ] !== 'undefined') {
+            if ( config[ 'target_achieved|' + field.original_position ]) {
+              if (cellValue.value >= 1) {
+                text = 'Target Achieved';
+                cell.classList.add('good');
+              }
+            }
+          }
+
+          textNode = document.createTextNode(text)
           cell.classList.add(styles);
-          cell.setAttribute('rowspan', spanner)
-          cell.appendChild(text)          
+          cell.setAttribute('rowspan', spanner);
+          cell.appendChild(textNode);
         }
       }
     }
