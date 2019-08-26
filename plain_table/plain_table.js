@@ -12,7 +12,7 @@ const addCSS = link => {
 };
 
 const loadStylesheets = () => {
-  addCSS('https://jwtest.ngrok.io/plain_table/plain_table.css');
+  addCSS('https://storage.googleapis.com/media-jw-test-environment/vis/plain_table.css');
 };
 
 const options = {
@@ -56,6 +56,14 @@ const getNewConfigOptions = function(config, fields) {
       label: fields[i].name,
       order: i,
     }
+
+    newOptions['conditional|' + i] = {
+      section: "Formatting",
+      type: "boolean",
+      label: fields[i].name,
+      order: i,
+    }
+
   }
   return newOptions
 }
@@ -103,6 +111,7 @@ const getTableStructure = function(config, fields) {
     }
 
     field_definition = {
+      original_position: f,
       name: fields[f].name,
       display_name: label,
       styles: styles 
@@ -131,9 +140,11 @@ const getTableStructure = function(config, fields) {
 }
 
 
-const buildHeader = function(table, tableStructure) {
+const buildHeader = function(table, tableStructure, cols) {
   thead = table.createTHead();
   headerGroups = thead.insertRow();
+  col_width = parseInt  (100 / cols) + '%';
+  console.log('col_width', col_width)
   if (tableStructure.length > 2) {
     for (var i = 0; i < tableStructure.length; i++) {
         if (tableStructure[i].fields.length > 0) {
@@ -148,11 +159,12 @@ const buildHeader = function(table, tableStructure) {
   }
 
   headerRow = thead.insertRow();
-  col_width = (100 / 7) + '%';
+  col_width = parseInt  (100 / cols) + '%';
+  console.log('col_width', col_width)
   for (var i = 0; i < tableStructure.length; i++) {
     for (var j = 0; j < tableStructure[i].fields.length; j++) {
       th = document.createElement('th');
-      th.setAttribute('width', col_width  );
+      th.setAttribute('width', col_width );
       th.classList.add('secondary');
       th.classList.add(tableStructure[i].fields[j].styles);
       text = document.createTextNode(tableStructure[i].fields[j].display_name);
@@ -178,7 +190,7 @@ const buildFooter = function(table, rows, cols, rowLimit) {
 }
 
 
-const buildRows = function(data, table, tableStructure, rowLimit) {
+const buildRows = function(data, table, tableStructure, rowLimit, config) {
   rows_to_render = Math.min(rowLimit, data.length);
   dims = tableStructure[0].fields;
 
@@ -188,16 +200,16 @@ const buildRows = function(data, table, tableStructure, rowLimit) {
     rowspan_values[0].push(1);
     span_tracker.push(1);
   }
-  console.log('rows_to_render', rows_to_render);
-  console.log('starting rowspan_values', rowspan_values);
-  console.log('starting span_tracker values', span_tracker);
 
-
+  // Build up an array of wherevrowspans are required
   for (let i = rows_to_render-1; i >= 0; i--) {
     row_index = rows_to_render - 1 - i;
     rowspan_values[row_index] = [];
     for (let j = 0; j < dims.length; j++) {
-      if (i > 0 && data[i][dims[j].name].value == data[i-1][dims[j].name].value) {
+      if (i > 0 
+          && j == 0
+          && data[i][dims[j].name].value == data[i-1][dims[j].name].value) 
+      {
         rowspan_values[row_index][j] = -1;
         span_tracker[j] += 1;
       } else {
@@ -207,8 +219,6 @@ const buildRows = function(data, table, tableStructure, rowLimit) {
     }
   }
   rowspan_values.reverse();
-  console.log('reversed', rowspan_values);
-
 
   for (var i = 0; i < rows_to_render; i++) {
     bodyRow = table.insertRow();
@@ -223,14 +233,25 @@ const buildRows = function(data, table, tableStructure, rowLimit) {
         if (spanner == -1) {
           continue;
         } else {
-          cellValue = data[i][tableStructure[j].fields[k].name];
-          styles = tableStructure[j].fields[k].styles;
+          field = tableStructure[j].fields[k]
+          cellValue = data[i][field.name];
+          styles = field.styles;
           cell = bodyRow.insertCell();
 
           if (typeof cellValue.rendered == 'undefined') {
             text = document.createTextNode(cellValue.value)
           } else {
             text = document.createTextNode(cellValue.rendered)
+          }
+
+          if (typeof config[ 'conditional|' + field.original_position ] !== 'undefined') {
+            if ( config[ 'conditional|' + field.original_position ]) {
+              if (cellValue.value > 0) {
+                cell.classList.add('good')
+              } else if (cellValue.value < 0) {
+                cell.classList.add('bad')
+              }
+            }
           }
 
           cell.classList.add(styles);
@@ -243,13 +264,13 @@ const buildRows = function(data, table, tableStructure, rowLimit) {
 }
 
 
-const buildTable = function(data, tableStructure, rows, cols, rowLimit) {
+const buildTable = function(data, tableStructure, rows, cols, rowLimit, config) {
   table = document.createElement('table');
   table.id = 'reportTable_new';
   table.className = 'reportTable';
 
-  buildHeader(table, tableStructure);
-  buildRows(data, table, tableStructure, rowLimit);
+  buildHeader(table, tableStructure, cols);
+  buildRows(data, table, tableStructure, rowLimit, config);
   buildFooter(table, rows, cols, rowLimit);
 
   document.getElementById('tableContainer').appendChild(table);
@@ -309,7 +330,7 @@ looker.plugins.visualizations.add({
     new_options = getNewConfigOptions(config, fields);
     this.trigger("registerOptions", new_options);
 
-    buildTable(data, tableStructure, data.length, fields.length, rowLimit);
+    buildTable(data, tableStructure, data.length, fields.length, rowLimit, config);
     
     done();
   }
