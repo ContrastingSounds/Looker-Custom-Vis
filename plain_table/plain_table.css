@@ -1,6 +1,6 @@
 table.reportTable {
   font-family: Open Sans,Helvetica,Arial,sans-serif;
-  font-size: 12px;   
+  font-size: 10px;   
   width: 100%;
   border: 1px solid #CCCCCC;
   border-collapse: collapse;
@@ -9,7 +9,7 @@ table.reportTable {
 
 table.reportTable th {
   border: 1px solid #CCCCCC;
-  font-size: 14px; 
+  font-size: 10px; 
   height: 25px;
   padding: 5px;
 }
@@ -23,7 +23,6 @@ table.reportTable td {
   padding: 2px;
   /*background: #FFFFFF;*/
   border: 1px solid #CCCCCC;
-
 
   max-width: 0;
   overflow: hidden;
@@ -77,3 +76,6 @@ table.reportTable td {
   color: #FFFFFF;
 }
 
+.nolink {
+    text-decoration: none;
+}

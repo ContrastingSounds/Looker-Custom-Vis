@@ -12,8 +12,7 @@ const addCSS = link => {
 };
 
 const loadStylesheets = () => {
-  // addCSS('https://storage.googleapis.com/media-jw-test-environment/vis/plain_table.css');
-  addCSS('https://jwtest.ngrok.io/plain_table/plain_table.css');
+  addCSS('https://storage.googleapis.com/media-jw-test-environment/vis/plain_table.css');
 };
 
 const options = {
@@ -45,7 +44,7 @@ const getNewConfigOptions = function(config, fields) {
     newOptions['label|' + i] = {
       section: "Columns",
       type: "string",
-      label: fields[i].label_short,
+      label: fields[i].label_short || fields[i].label,
       order: i * 10,
     }
 
@@ -110,7 +109,7 @@ const getTableStructure = function(config, fields) {
     if (typeof config['label|' + f] !== 'undefined') {
       label = config['label|' + f]
     } else {
-      label = fields[f].label_short
+      label = fields[f].label_short || fields[f].label
     }
 
     styles = [];
@@ -156,7 +155,6 @@ const buildHeader = function(table, tableStructure, cols) {
   if (tableStructure.length > 2) {
     headerGroups = thead.insertRow();
     col_width = parseInt  (100 / cols) + '%';
-    console.log('col_width', col_width)
     for (var i = 0; i < tableStructure.length; i++) {
         if (tableStructure[i].fields.length > 0) {
         th = document.createElement('th');
@@ -244,18 +242,14 @@ const buildRows = function(data, table, tableStructure, rowLimit, config) {
         if (spanner == -1) {
           continue;
         } else {
-          field = tableStructure[j].fields[k]
-          cellValue = data[i][field.name];
-          styles = field.styles;
-          cell = bodyRow.insertCell();
+          let field = tableStructure[j].fields[k]
+          let cellValue = data[i][field.name];
+          let styles = field.styles;
+          let cell = bodyRow.insertCell();
 
-          if (typeof cellValue.rendered == 'undefined') {
-            text = cellValue.value
-          } else {
-            text = cellValue.rendered
-          }
+          text = LookerCharts.Utils.textForCell(data[i][field.name]);
 
-          if (cellValue.value == 0) {
+          if (cellValue.value == 0 || cellValue.value == null) {
             text = '-';
             cell.classList.add('zero')
           }
@@ -283,6 +277,13 @@ const buildRows = function(data, table, tableStructure, rowLimit, config) {
           cell.classList.add(styles);
           cell.setAttribute('rowspan', spanner);
           cell.appendChild(textNode);
+
+          cell.onclick = function(event) {
+            LookerCharts.Utils.openDrillMenu({
+              links: cellValue.links,
+              event: event
+            });
+          };
         }
       }
     }
