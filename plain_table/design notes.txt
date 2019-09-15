@@ -1,0 +1,112 @@
+=== buildTableStructure
+
+
+## Build table_headers
+
+tableStructure = list[header_objects]
+  
+
+Build array of objects:
+- 'ungrouped_dimensions'
+- Header Groups from config
+- 'ungrouped_metrics'
+
+{
+  header_group: {
+    display_name: string,
+    fields: []
+  }
+}
+
+
+## Build field_objects
+
+{ 
+  field_name: {
+    display_name: string,
+    justify: left|right,
+    font: regular|bold,
+    format: normal|greenred,
+  }
+}
+
+For each field: 
+(i = 0, i < field.length)
+- construct object
+- display_name based on label in config (if any)
+- justify left/right based on is_numeric
+- (TODO: formatting)
+- if assigned to header_group in config
+  - push on to header_group.fields array
+  - ELSE:
+    - if dimension, push on to ungrouped_dimensions.fields
+    - if measure, push on to ungrouped_measures.fields
+
+
+{
+  header_group: {
+    display_name: string,
+    fields: list[field_object],
+  }
+}
+
+
+## Return tableStructure
+
+
+
+=== buildHeader
+
+Build header group row
+- insertRow
+- for each header_group
+  - Create element
+  - Set class
+  - Set colspan
+  - Add text
+  - Append to row
+
+Build field headers
+- insertRow
+- for each header_group
+  - for each field_name
+    - Create element
+    - Set class
+    - Add text
+    - Append to row
+
+
+=== buildRows
+
+- calculate the rowspan_values[]
+[
+  [1, 1, 1, ..],
+]
+
+span_tracker = [1, 1, 1, ..]
+
+
+For each row i in reverse order
+- For each field j in ungrouped_dimensions
+  - if value matches value of row above (i to i-1)
+    - rowspan_values[i][j] = -1
+    - span_tracker[j] += 1
+  - if value does not match value of row above
+    - rowspan_values[i][j] = span_tracker[j]
+    - span_tracker[j] = 1
+
+rowspan_values.reverse()
+
+For each row
+- insertRow
+  - for each field
+    - if ungrouped_dimension
+      - Check if to skip
+    - Create element
+    - if ungrouped_dimension and rowspan > 1
+      - Set rowspan
+    - Set class
+    - Add text
+    - Append to row
+
+

@@ -24,6 +24,14 @@ reportTableStyle = `
   table.reportTable thead th:first-child {
     border-left: none;
   }
+
+  table.reportTable tbody {
+    background: #FFFFFF;
+  }
+
+  table.reportTable tbody td {
+    background: #FFFFFF;
+  }
 `
 
 const globalOptions = {

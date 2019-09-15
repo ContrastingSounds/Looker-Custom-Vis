@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://unpkg.com/ag-grid-community/dist/ag-grid-community.min.noStyle.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/ag-grid-community/dist/styles/ag-grid.css">
+  <link rel="stylesheet" href="https://unpkg.com/ag-grid-community/dist/styles/ag-theme-balham.css">
+</head>
+<body> 
+  <div id="ag-grid-vis" style="height: 200px; width: 700px;" class="ag-theme-balham"></div>
+
+  <script type="text/javascript" charset="utf-8">
+    // specify the columns
+    var testColumnDefs = [
+      {headerName: "Make", field: "make", sortable: true, filter: true },
+      {headerName: "Model", field: "model", sortable: true, filter: true},
+      {headerName: "Price", field: "price", sortable: true, filter: true},
+    ];
+    
+    // specify the data
+    var testRowData = [
+      {make: "Toyota", model: "Celica", price: 35000},
+      {make: "Ford", model: "Mondeo", price: 32000},
+      {make: "Porsche", model: "Boxter", price: 72000}
+    ];
+    
+    // let the grid know which columns and what data to use
+    gridOptions = {
+      columnDefs: testColumnDefs,
+      rowData: testRowData,
+    };
+
+    var gridDiv = document.querySelector('#ag-grid-vis');
+    new agGrid.Grid(gridDiv, gridOptions);
+
+    newDiv = document.createElement('p');
+    newContent = document.createTextNode('Vis has rendered.'); 
+    newDiv.appendChild(newContent);
+    gridDiv.appendChild(newDiv);
+
+  </script>
+</body>
+</html>

@@ -168,7 +168,6 @@ const buildHeader = function(table, tableStructure, cols) {
   }
 
   headerRow = thead.insertRow();
-  col_width = parseInt  (100 / cols) + '%';
   console.log('col_width', col_width)
   for (var i = 0; i < tableStructure.length; i++) {
     for (var j = 0; j < tableStructure[i].fields.length; j++) {
