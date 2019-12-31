@@ -162,7 +162,7 @@ const buildFlatData = function(data, queryResponse) {
   }
 
   if (typeof queryResponse.totals_data !== 'undefined') {
-    console.log('Processing totals data')
+    parser = new DOMParser()
     var totals = queryResponse.totals_data
     if (pivots.length > 0) {
       var row = {}
@@ -176,6 +176,10 @@ const buildFlatData = function(data, queryResponse) {
             measureName = meas[m]['name']
             cellKey = pivotKey + '.' + measureName
             cellValue = totals[measureName][pivotKey]
+            if (typeof cellValue.rendered == 'undefined' && typeof cellValue.html !== 'undefined' ){
+              rendered = parser.parseFromString(cellValue.html, 'text/html')
+              cellValue.rendered = rendered.getElementsByTagName('a')[0].innerText
+            }
             row[cellKey] = cellValue
           }
         }
