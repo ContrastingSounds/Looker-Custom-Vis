@@ -184,15 +184,40 @@ const buildFlatData = function(data, queryResponse) {
           }
         }
       }
+      row['$$$_totals_$$$'] = true
       flatData.data.push(row)
     } else {
       for (var d = 0; d < dims.length; d++) {
         totals[dims[d].name] = { 'value': '' }
       }
-      flatData.data.push(totals)
+      row = { ...{'$$$_totals_$$$': true}, ...totals}
+      flatData.data.push(row)
     }
   }
+  flatData.totals = true
   return flatData
+}
+
+const addSubTotals = function(flatData, dims, depth) {
+  console.log('Processing subtotals to depth 2')
+
+  subTotals = []
+  latest_grouping = []
+  for (var r = 0; r < flatData.data.length; r++) {    
+    row = flatData.data[r]
+    if(typeof row['$$$_totals_$$$'] === 'undefined') {
+      grouping = []
+      for (var g = 0; g < depth; g++) {
+        grouping.push(row[dims[g].name].value)
+      }
+      if (grouping.join('|') !== latest_grouping.join('|')) {
+        console.log(latest_grouping, grouping)
+        subTotals.push(grouping)
+        latest_grouping = grouping
+      }
+    }
+  }
+  console.log('subTotals', subTotals)
 }
 
 looker.plugins.visualizations.add({
@@ -241,10 +266,12 @@ looker.plugins.visualizations.add({
 
     flatData = buildFlatData(data, queryResponse)
 
+    var subTotalsDepth = 2
+    addSubTotals(flatData, queryResponse.fields.dimension_like, subTotalsDepth)
+
     buildVis(flatData);
 
     console.log(flatData)
-    console.log(queryResponse.totals_data)
     
     done();
   }
