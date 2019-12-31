@@ -59,7 +59,6 @@ const buildVis = function(flatData) {
     .selectAll('th')
     .data(flatData.headers).enter()
     .append('th')
-    // .attr('class', ƒ('cl'))
     .text(d => d.header_name);
   
   // create table body
@@ -69,14 +68,17 @@ const buildVis = function(flatData) {
     .append('tr')
     .selectAll('td')
     .data(function(row, i) {
-      console.log('row, i', row, i);
       return flatData.headers.map(function(column) {
         var cell = row[column.header_name]
+        cell.align = column.align
         return cell;
       })
     }).enter()
     .append('td')
-    .text(d => d.rendered || d.value); // ???
+    .text(d => d.rendered || d.value)
+    .attr('class', d => d.align)
+  
+  console.log(table);
 }
 
 const buildFlatData = function(data, queryResponse) {

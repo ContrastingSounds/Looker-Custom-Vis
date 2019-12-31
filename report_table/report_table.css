@@ -31,6 +31,14 @@ table.reportTable td {
   white-space: nowrap;
 }
 
+.left {
+  text-align: left;
+}
+
+.right {
+  text-align: right;
+}
+
 .primary {
   border: 1px solid #CCCCCC;
   background: #E60000;
