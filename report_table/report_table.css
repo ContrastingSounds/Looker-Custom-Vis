@@ -1,0 +1,46 @@
+table.reportTable {
+  font-family: Open Sans,Helvetica,Arial,sans-serif;
+  font-size: 10px;   
+  width: 100%;
+  border: 1px solid #CCCCCC;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+table.reportTable th {
+  border: 1px solid #CCCCCC;
+  font-size: 10px; 
+  height: 25px;
+  padding: 5px;
+
+  max-width: 0px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+table.reportTable td {
+  vertical-align: super;
+  padding: 2px;
+  /*background: #FFFFFF;*/
+  border: 1px solid #CCCCCC;
+
+  max-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.primary {
+  border: 1px solid #CCCCCC;
+  background: #E60000;
+  font-weight: bold;
+  color: #FFFFFF;
+}
+
+.secondary {
+  border: 1px solid #CCCCCC;
+  background: #AAAAAA;
+  font-weight: normal;
+  color: #FFFFFF;
+}
