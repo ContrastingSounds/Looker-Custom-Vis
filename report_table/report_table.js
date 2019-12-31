@@ -132,7 +132,6 @@ const buildFlatData = function(data, queryResponse) {
 
   for (var i = 0; i < data.length; i++) {
     row = {}
-    
     for (var d = 0; d < dims.length; d++) {
       row[dims[d].name] = data[i][dims[d].name]
     }
@@ -162,6 +161,33 @@ const buildFlatData = function(data, queryResponse) {
     flatData.data.push(row)
   }
 
+  if (typeof queryResponse.totals_data !== 'undefined') {
+    console.log('Processing totals data')
+    var totals = queryResponse.totals_data
+    if (pivots.length > 0) {
+      var row = {}
+      for (var d = 0; d < dims.length; d++) {
+        row[dims[d].name] = { 'value': '' }
+      }
+      for(var p = 0; p < pivots.length; p++) {
+        for (var m = 0; m < meas.length; m++) {
+          if (!pivots[p].is_total || typeof meas[m].is_table_calculation  == 'undefined') {
+            pivotKey = pivots[p]['key']
+            measureName = meas[m]['name']
+            cellKey = pivotKey + '.' + measureName
+            cellValue = totals[measureName][pivotKey]
+            row[cellKey] = cellValue
+          }
+        }
+      }
+      flatData.data.push(row)
+    } else {
+      for (var d = 0; d < dims.length; d++) {
+        totals[dims[d].name] = { 'value': '' }
+      }
+      flatData.data.push(totals)
+    }
+  }
   return flatData
 }
 
@@ -210,9 +236,11 @@ looker.plugins.visualizations.add({
     this.trigger("registerOptions", new_options);
 
     flatData = buildFlatData(data, queryResponse)
-    console.log(flatData)
 
     buildVis(flatData);
+
+    console.log(flatData)
+    console.log(queryResponse.totals_data)
     
     done();
   }
