@@ -39,6 +39,11 @@ table.reportTable td {
   text-align: right;
 }
 
+table.reportTable td.total {
+  border-top: 2px solid #000000;
+  font-weight: bold;
+}
+
 .primary {
   border: 1px solid #CCCCCC;
   background: #E60000;

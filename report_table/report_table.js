@@ -61,13 +61,14 @@ const buildVis = function(flatData) {
     .append('th')
     .text(d => d.header_name);
   
+  var align = 'right'
   // create table body
   table.append('tbody')
     .selectAll('tr')
     .data(flatData.data).enter()
     .append('tr')
     .selectAll('td')
-    .data(function(row, i) {
+    .data(function(row) {
       return flatData.headers.map(function(column) {
         var cell = row[column.header_name]
         cell.align = column.align
@@ -76,7 +77,15 @@ const buildVis = function(flatData) {
     }).enter()
     .append('td')
     .text(d => d.rendered || d.value)
-    .attr('class', d => d.align)
+    // .attr('class', d => d.align)
+    // // .classed(function (d) {return d.align}, true)
+    // .classed('total', d => typeof d.cell_style !== 'undefined')
+    .attr('class', d => {
+      classes = []
+      classes.push(d.align)
+      if (typeof d.cell_style !== 'undefined') { classes.push('total') }
+      return classes.join(' ')
+    })
   
   console.log(table);
 }
@@ -149,7 +158,7 @@ const buildFlatData = function(data, queryResponse) {
       }
     } else {
       for (var m = 0; m < meas.length; m++) {
-        row[meas[m].name] = data[i][meas[m].name]
+        row[meas[m].name] = data[i][meas[m].name] 
       }
     }
     if (supers) {
@@ -176,6 +185,7 @@ const buildFlatData = function(data, queryResponse) {
             measureName = meas[m]['name']
             cellKey = pivotKey + '.' + measureName
             cellValue = totals[measureName][pivotKey]
+            cellValue['cell_style'] = 'total'
             if (typeof cellValue.rendered == 'undefined' && typeof cellValue.html !== 'undefined' ){
               rendered = parser.parseFromString(cellValue.html, 'text/html')
               cellValue.rendered = rendered.getElementsByTagName('a')[0].innerText
