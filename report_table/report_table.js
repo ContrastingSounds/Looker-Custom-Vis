@@ -210,8 +210,14 @@ class FlatData {
       subtotal.sort = [0, s, 9999]
       this.data.push(subtotal)
     }
-    var sort_func = function(a, b) { if (a.sort > b.sort) {return 1} else {return -1} }
-    this.data.sort(sort_func)
+    var compare_sort_values = (a, b) => {
+      for(var i=0; i<3; i++) {
+          if (a.sort[i] > b.sort[i]) { return 1 }
+          if (a.sort[i] < b.sort[i]) { return -1 }
+      }
+      return -1
+    }
+    this.data.sort(compare_sort_values)
     this.subtotals = true
   }
 
