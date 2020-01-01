@@ -21,7 +21,7 @@ table.reportTable th {
 
 table.reportTable td {
   vertical-align: super;
-  padding: 2px;
+  padding-left: 5px;
   /*background: #FFFFFF;*/
   border: 1px solid #CCCCCC;
 
@@ -39,9 +39,13 @@ table.reportTable td {
   text-align: right;
 }
 
-table.reportTable td.total {
-  border-top: 2px solid #000000;
-  font-weight: bold;
+.indent {
+  padding-left: 15px !important;
+}
+
+.total {
+  border-top: 2px solid #000000 !important;
+  font-weight: bold !important;
 }
 
 .primary {

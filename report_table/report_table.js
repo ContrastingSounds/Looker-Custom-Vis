@@ -89,7 +89,7 @@ class FlatData {
       }
       var idx = this.number_of_dimensions - 1
       var final_value = lookerData[i][this.dims[idx].name].value
-      row.data['$$$_index_$$$'] = { 'value': '___' + final_value }
+      row.data['$$$_index_$$$'] = { 'value': final_value, 'cell_style': 'indent' }
 
       if (pivots.length > 0) {
         // PIVOTED MEASURES
@@ -129,7 +129,7 @@ class FlatData {
 
       if (pivots.length > 0) {
         var row = new Row('total')
-        row.data['$$$_index_$$$'] = { 'value': 'TOTAL', cell_style: "total" }
+        row.data['$$$_index_$$$'] = { 'value': 'TOTAL', cell_style: 'total' }
         // DIMENSIONS
         for (var d = 0; d < this.dims.length; d++) {
           if (d+1 == this.dims.length) {
@@ -164,6 +164,7 @@ class FlatData {
           for (var s = 0; s < supers.length; s++) {
             var super_ = supers[s].name
             row.data[super_] = totals_[super_]
+            row.data[super_].cell_style = 'total'
           }
         }
       } else {
@@ -181,7 +182,6 @@ class FlatData {
       row.sort = [1, 0, 0]
       this.data.push(row)
       this.totals = true
-      console.log('totals row', row)
     }
   }
 
@@ -353,7 +353,6 @@ const buildReportTable = function(flatData, index_column=false) {
     .append('tr')
     .selectAll('td')
     .data(function(row) {
-      console.log('columns', flatData.headers(index_column));
       return flatData.headers(index_column).map(function(column) {
         var cell = row.data[column.id]
         cell.align = column.field.align
@@ -364,10 +363,15 @@ const buildReportTable = function(flatData, index_column=false) {
     .text(d => d.rendered || d.value)
     .attr('class', d => {
       classes = []
-      classes.push(d.align)
-      if (typeof d.cell_style !== 'undefined') { classes.push('total') }
+      if (typeof d.align !== 'undefined') { classes.push(d.align) }
+      if (typeof d.cell_style !== 'undefined') { 
+        if (d.cell_style == 'indent') {console.log('INDENT!')}
+        var styles = d.cell_style.split(' ')
+        classes = classes.concat(styles) 
+      }
       return classes.join(' ')
     })
+    console.log(table)
 }
 
 looker.plugins.visualizations.add({
