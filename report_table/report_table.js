@@ -24,9 +24,11 @@ class FlatData {
   constructor(lookerData, queryResponse) {
     this.columns = []
     this.data = []
-
     this.dims = queryResponse.fields.dimension_like
     this.number_of_dimensions = this.dims.length
+    this.totals = false
+    this.subtotals = false
+
     var meas = queryResponse.fields.measure_like
     var pivots = queryResponse.pivots
     if (typeof queryResponse.pivots !== 'undefined') {
@@ -37,6 +39,8 @@ class FlatData {
       supers = queryResponse.fields.supermeasure_like
     }
 
+    // BUILD COLUMNS
+    //
     for (var d = 0; d < this.dims.length; d++) {
       // var column = { ...{'id': dims[d].name}, ...dims[d]}
       var column = new Column(this.dims[d].name)
@@ -46,12 +50,14 @@ class FlatData {
     if (pivots.length > 0) {
       for(var p = 0; p < pivots.length; p++) {
         for (var m = 0; m < meas.length; m++) {
-          var pivotKey = pivots[p]['key']
-          var measureName = meas[m]['name']
-          var columnId = pivotKey + '.' + measureName
-          var column = new Column(columnId)
-          column.field = meas[m]
-          this.columns.push(column)
+          if (typeof meas[m].is_table_calculation === 'undefined') {
+            var pivotKey = pivots[p]['key']
+            var measureName = meas[m]['name']
+            var columnId = pivotKey + '.' + measureName
+            var column = new Column(columnId)
+            column.field = meas[m]
+            this.columns.push(column)
+          }
         }
       }
     } else {
@@ -61,7 +67,7 @@ class FlatData {
         this.columns.push(column)
       }
     }
-    if (supers) {
+    if (supers.length > 0) {
       for (var s = 0; s < supers.length; s++) {
         var column = new Column(supers[s].name)
         column.field = supers[s]
@@ -69,13 +75,19 @@ class FlatData {
       }
     }
   
+    // BUILD ROWS
+    //
     for (var i = 0; i < lookerData.length; i++) {
       var row = new Row('line_item')
+
+      // DIMENSIONS
       for (var d = 0; d < this.dims.length; d++) {
         var dim = this.dims[d].name
         row.data[dim] = lookerData[i][dim]
       }
+
       if (pivots.length > 0) {
+        // PIVOTED MEASURES
         for(var p = 0; p < pivots.length; p++) {
           for (var m = 0; m < meas.length; m++) {
             if (!pivots[p].is_total || typeof meas[m].is_table_calculation  == 'undefined') {
@@ -88,14 +100,16 @@ class FlatData {
           }
         }
       } else {
+        // MEASURES
         for (var m = 0; m < meas.length; m++) {
-          mea = meas[m].name
+          var mea = meas[m].name
           row.data[mea] = lookerData[i][mea] 
         }
       }
-      if (supers) {
+      // SUPERMEASURES
+      if (supers.length > 0) {
         for (var s = 0; s < supers.length; s++) {
-          super_ = supers[s].name
+          var super_ = supers[s].name
           row.data[super_] = lookerData[i][super_]
         }
       }
@@ -103,11 +117,14 @@ class FlatData {
       this.data.push(row)
     }
   
+    // TOTALS ROW
     if (typeof queryResponse.totals_data !== 'undefined') {
       var parser = new DOMParser()
       var totals_ = queryResponse.totals_data
+
       if (pivots.length > 0) {
         var row = new Row('total')
+        // DIMENSIONS
         for (var d = 0; d < this.dims.length; d++) {
           if (d+1 == this.dims.length) {
             row.data[this.dims[d].name] = { 'value': 'TOTAL', 'cell_style': 'total' }
@@ -115,6 +132,7 @@ class FlatData {
             row.data[this.dims[d].name] = { 'value': '' }
           }
         }
+        // MEASURES
         for(var p = 0; p < pivots.length; p++) {
           for (var m = 0; m < meas.length; m++) {
             if (!pivots[p].is_total || typeof meas[m].is_table_calculation  == 'undefined') {
@@ -123,7 +141,11 @@ class FlatData {
               var cellKey = pivotKey + '.' + measureName
               var cellValue = totals_[measureName][pivotKey]
               cellValue['cell_style'] = 'total'
-              if (typeof cellValue.rendered == 'undefined' && typeof cellValue.html !== 'undefined' ){
+              if (typeof 
+                    cellValue.rendered == 'undefined' 
+                    && typeof cellValue.html !== 'undefined'
+                    && cellValue.html != ''
+              ){
                 var rendered = parser.parseFromString(cellValue.html, 'text/html')
                 cellValue.rendered = rendered.getElementsByTagName('a')[0].innerText
               }
@@ -131,7 +153,15 @@ class FlatData {
             }
           }
         }
+        // SUPERMEASURES
+        if (supers.length > 0) {
+          for (var s = 0; s < supers.length; s++) {
+            var super_ = supers[s].name
+            row.data[super_] = totals_[super_]
+          }
+        }
       } else {
+        // Straight copy except for adding "TOTAL" label
         for (var d = 0; d < this.dims.length; d++) {
           if (d+1 == this.dims.length) {
             totals_[this.dims[d].name] = { 'value': 'TOTAL' }
@@ -179,10 +209,24 @@ class FlatData {
       }
       subtotal.sort = [0, s, 9999]
       this.data.push(subtotal)
-  
-      var sort_func = function(a, b) { if (a.sort > b.sort) {return 1} else {return -1} }
-      this.data.sort(sort_func)
     }
+    var sort_func = function(a, b) { if (a.sort > b.sort) {return 1} else {return -1} }
+    this.data.sort(sort_func)
+    this.subtotals = true
+  }
+
+  raw() {
+    var raw_values = []
+    this.data.forEach(r => {
+      if (r.type === 'line_item') {
+        var row = {}
+        this.columns.forEach(c => {
+          row[c.id] = r.data[c.id].value
+        })
+        raw_values.push(row)
+      }
+    })
+    return raw_values
   }
 }
 
@@ -352,9 +396,12 @@ looker.plugins.visualizations.add({
     new_options = getNewConfigOptions(config, fields);
     this.trigger("registerOptions", new_options);
 
-    flatDataObject = new FlatData(data, queryResponse)
-    flatDataObject.addSubTotals(config.subtotalDepth)
-    buildVis(flatDataObject);
+    flatData = new FlatData(data, queryResponse)
+    flatData.addSubTotals(config.subtotalDepth)
+    buildVis(flatData);
+
+    console.log(flatData)
+    console.log(flatData.raw())
     
     done();
   }

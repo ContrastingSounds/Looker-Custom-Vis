@@ -1,7 +1,10 @@
 export interface FlatData {
   headers: Header[]
   columns: Column[]
+  dims: object[]
+  number_of_dimensions: number
   data: Row[]
+  subtotals: boolean
   totals: boolean
   raw: () => { [key: string]: number | string }
 }
