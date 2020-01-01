@@ -9,7 +9,7 @@ table.reportTable {
 
 table.reportTable th {
   border: 1px solid #CCCCCC;
-  font-size: 10px; 
+  /* font-size: 10px;  */
   height: 25px;
   padding: 5px;
 

@@ -8,7 +8,7 @@
   - Add the subtotal rows
   - Have a single dimension column, appropriately indented for line items / subtotals / totals
   - Have a single dimension column, appropriately bolded/capitalised for line items / subtotals / totals
-  - Colspans for pivots
+  - Colspans/multiple headers for pivots
   - Option to put total at top or bottom
   - Option to put subtotals above or below rows
   - Ability to hide rows associated with a given subtotal

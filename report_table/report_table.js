@@ -1,6 +1,190 @@
-/* Dependency: None yet. */
+/* Dependency: https://cdnjs.cloudflare.com/ajax/libs/d3/5.15.0/d3.min.js */
 
-debug = true;
+// TODO: update flatData.data so that each row has a single_dimension value
+// TODO: update table building to handle singleDimensionColumn option
+
+debug = false;
+
+class Row {
+  constructor(type) {
+    this.type = type
+    this.sort = []
+    this.data = {}
+  }
+}
+
+class Column {
+  constructor(id) {
+    this.id = id
+    this.field = {}
+  }
+}
+
+class FlatData {
+  constructor(lookerData, queryResponse) {
+    this.columns = []
+    this.data = []
+
+    this.dims = queryResponse.fields.dimension_like
+    this.number_of_dimensions = this.dims.length
+    var meas = queryResponse.fields.measure_like
+    var pivots = queryResponse.pivots
+    if (typeof queryResponse.pivots !== 'undefined') {
+      pivots = queryResponse.pivots
+    }
+    var supers = []
+    if (typeof queryResponse.fields.supermeasure_like !== 'undefined') {
+      supers = queryResponse.fields.supermeasure_like
+    }
+
+    for (var d = 0; d < this.dims.length; d++) {
+      // var column = { ...{'id': dims[d].name}, ...dims[d]}
+      var column = new Column(this.dims[d].name)
+      column.field = this.dims[d]
+      this.columns.push(column)
+    }
+    if (pivots.length > 0) {
+      for(var p = 0; p < pivots.length; p++) {
+        for (var m = 0; m < meas.length; m++) {
+          var pivotKey = pivots[p]['key']
+          var measureName = meas[m]['name']
+          var columnId = pivotKey + '.' + measureName
+          var column = new Column(columnId)
+          column.field = meas[m]
+          this.columns.push(column)
+        }
+      }
+    } else {
+      for (var m = 0; m < meas.length; m++) {
+        var column = new Column(meas[m].name)
+        column.field = meas[m]
+        this.columns.push(column)
+      }
+    }
+    if (supers) {
+      for (var s = 0; s < supers.length; s++) {
+        var column = new Column(supers[s].name)
+        column.field = supers[s]
+        this.columns.push(column)
+      }
+    }
+  
+    for (var i = 0; i < lookerData.length; i++) {
+      var row = new Row('line_item')
+      for (var d = 0; d < this.dims.length; d++) {
+        var dim = this.dims[d].name
+        row.data[dim] = lookerData[i][dim]
+      }
+      if (pivots.length > 0) {
+        for(var p = 0; p < pivots.length; p++) {
+          for (var m = 0; m < meas.length; m++) {
+            if (!pivots[p].is_total || typeof meas[m].is_table_calculation  == 'undefined') {
+              var pivotKey = pivots[p]['key']
+              var measureName = meas[m]['name']
+              var cellKey = pivotKey + '.' + measureName
+              var cellValue = lookerData[i][measureName][pivotKey]
+              row.data[cellKey] = cellValue
+            }
+          }
+        }
+      } else {
+        for (var m = 0; m < meas.length; m++) {
+          mea = meas[m].name
+          row.data[mea] = lookerData[i][mea] 
+        }
+      }
+      if (supers) {
+        for (var s = 0; s < supers.length; s++) {
+          super_ = supers[s].name
+          row.data[super_] = lookerData[i][super_]
+        }
+      }
+      row.sort = [0, 0, i]
+      this.data.push(row)
+    }
+  
+    if (typeof queryResponse.totals_data !== 'undefined') {
+      var parser = new DOMParser()
+      var totals_ = queryResponse.totals_data
+      if (pivots.length > 0) {
+        var row = new Row('total')
+        for (var d = 0; d < this.dims.length; d++) {
+          if (d+1 == this.dims.length) {
+            row.data[this.dims[d].name] = { 'value': 'TOTAL', 'cell_style': 'total' }
+          } else {
+            row.data[this.dims[d].name] = { 'value': '' }
+          }
+        }
+        for(var p = 0; p < pivots.length; p++) {
+          for (var m = 0; m < meas.length; m++) {
+            if (!pivots[p].is_total || typeof meas[m].is_table_calculation  == 'undefined') {
+              var pivotKey = pivots[p]['key']
+              var measureName = meas[m]['name']
+              var cellKey = pivotKey + '.' + measureName
+              var cellValue = totals_[measureName][pivotKey]
+              cellValue['cell_style'] = 'total'
+              if (typeof cellValue.rendered == 'undefined' && typeof cellValue.html !== 'undefined' ){
+                var rendered = parser.parseFromString(cellValue.html, 'text/html')
+                cellValue.rendered = rendered.getElementsByTagName('a')[0].innerText
+              }
+              row.data[cellKey] = cellValue
+            }
+          }
+        }
+      } else {
+        for (var d = 0; d < this.dims.length; d++) {
+          if (d+1 == this.dims.length) {
+            totals_[this.dims[d].name] = { 'value': 'TOTAL' }
+          } else {
+            totals_[this.dims[d].name] = { 'value': '' }
+          }
+        }
+        row.data = totals_
+        
+      }
+      row.sort = [1, 0, 0]
+      this.data.push(row)
+      this.totals = true
+    }
+  }
+
+  addSubTotals (depth) { // (flatData, dims, depth) {
+    if (typeof depth === 'undefined') { depth = this.number_of_dimensions - 1 }
+    var subTotals = []
+    var latest_grouping = []
+    for (var r = 0; r < this.data.length; r++) {    
+      var row = this.data[r]
+      if (row.type !== 'total') {
+        var grouping = []
+        for (var g = 0; g < depth; g++) {
+          var dim = this.dims[g].name
+          grouping.push(row.data[dim].value)
+        }
+        if (grouping.join('|') !== latest_grouping.join('|')) {
+          subTotals.push(grouping)
+          latest_grouping = grouping
+        }
+        row.sort = [0, subTotals.length-1, r]
+      }
+    }
+    for (var s = 0; s < subTotals.length; s++) {
+      var subtotal = new Row('subtotal')
+      for (var c = 0; c < this.columns.length; c++) {
+        if (c+1 == this.dims.length) {
+          var subtotal_label = 'Total ' + subTotals[s].join(' – ') // [subTotals[s].length-1]
+          subtotal.data[this.columns[c]['id']] = {'value':  subtotal_label, 'cell_style': 'total'}
+        } else {
+          subtotal.data[this.columns[c]['id']] = ''
+        }
+      }
+      subtotal.sort = [0, s, 9999]
+      this.data.push(subtotal)
+  
+      var sort_func = function(a, b) { if (a.sort > b.sort) {return 1} else {return -1} }
+      this.data.sort(sort_func)
+    }
+  }
+}
 
 const addCSS = link => {
   const linkElement = document.createElement('link');
@@ -70,6 +254,20 @@ const getNewConfigOptions = function(config, fields) {
   return newOptions
 }
 
+const getHeaders = function(flatData, config, queryResponse) {
+  if (config.singleDimensionColumn) {
+    non_dimensions = flatData.columns.splice(queryResponse.fields.dimension_like.length)
+    single_dimension = {
+      'id': 'single_dimension',
+      'label': 'Single Dimension',
+      'align': 'left',
+    }
+    return [single_dimension].concat(non_dimensions)
+  } else {
+    return flatData.columns
+  }
+}
+
 const buildVis = function(flatData) {
 
   var table = d3.select('#visContainer')
@@ -79,9 +277,9 @@ const buildVis = function(flatData) {
   // create table header
   table.append('thead').append('tr')
     .selectAll('th')
-    .data(flatData.headers).enter()
+    .data(flatData.columns).enter()
     .append('th')
-    .text(d => d.header_name);
+    .text(d => d.id);
   
   var align = 'right'
   // create table body
@@ -91,9 +289,9 @@ const buildVis = function(flatData) {
     .append('tr')
     .selectAll('td')
     .data(function(row) {
-      return flatData.headers.map(function(column) {
-        var cell = row[column.header_name]
-        cell.align = column.align
+      return flatData.columns.map(function(column) {
+        var cell = row.data[column.id]
+        cell.align = column.field.align
         return cell;
       })
     }).enter()
@@ -108,172 +306,6 @@ const buildVis = function(flatData) {
       if (typeof d.cell_style !== 'undefined') { classes.push('total') }
       return classes.join(' ')
     })
-  
-  console.log(table);
-}
-
-const buildFlatData = function(data, queryResponse) {
-  var dims = queryResponse.fields.dimension_like
-  var meas = queryResponse.fields.measure_like
-  var pivots = queryResponse.fields.pivots
-  if (typeof queryResponse.pivots !== 'undefined') {
-    pivots = queryResponse.pivots
-    console.log(pivots)
-  }
-  var supers = []
-  if (typeof queryResponse.fields.supermeasure_like !== 'undefined') {
-    var supers = queryResponse.fields.supermeasure_like
-  }
-
-  console.log('Number of dimension_likes', dims.length)
-  console.log('Number of measure_likes', meas.length)
-  console.log('Number of pivots', pivots.length)
-  console.log('Number of supermeasure_likes', supers.length)
-  
-  flatData = {
-    'headers': [],
-    'data': []
-  }
-  for (var d = 0; d < dims.length; d++) {
-    header = { ...{'header_name': dims[d].name}, ...dims[d]}
-    flatData.headers.push(header)
-  }
-  if (pivots.length > 0) {
-    for(var p = 0; p < pivots.length; p++) {
-      for (var m = 0; m < meas.length; m++) {
-        pivotKey = pivots[p]['key']
-        measureName = meas[m]['name']
-        headerName = pivotKey + '.' + measureName
-        header = { ...{'header_name': headerName}, ...meas[m]}
-        flatData.headers.push(header)
-      }
-    }
-  } else {
-    for (var m = 0; m < meas.length; m++) {
-      header = { ...{'header_name': meas[m].name}, ...meas[m]}
-      flatData.headers.push(header)
-    }
-  }
-  if (supers) {
-    for (var s = 0; s < supers.length; s++) {
-      header = { ...{'header_name': supers[s].name}, ...supers[s]}
-      flatData.headers.push(header)
-    }
-  }
-
-  for (var i = 0; i < data.length; i++) {
-    row = {}
-    for (var d = 0; d < dims.length; d++) {
-      row[dims[d].name] = data[i][dims[d].name]
-    }
-    if (pivots.length > 0) {
-      for(var p = 0; p < pivots.length; p++) {
-        for (var m = 0; m < meas.length; m++) {
-          if (!pivots[p].is_total || typeof meas[m].is_table_calculation  == 'undefined') {
-            pivotKey = pivots[p]['key']
-            measureName = meas[m]['name']
-            cellKey = pivotKey + '.' + measureName
-            cellValue = data[i][measureName][pivotKey]
-            row[cellKey] = cellValue
-          }
-        }
-      }
-    } else {
-      for (var m = 0; m < meas.length; m++) {
-        row[meas[m].name] = data[i][meas[m].name] 
-      }
-    }
-    if (supers) {
-      for (var s = 0; s < supers.length; s++) {
-        row[supers[s].name] = data[i][supers[s].name]
-      }
-    }
-    row['$$$_sort_$$$'] = [0, 0, i]
-    flatData.data.push(row)
-  }
-
-  if (typeof queryResponse.totals_data !== 'undefined') {
-    parser = new DOMParser()
-    var totals = queryResponse.totals_data
-    if (pivots.length > 0) {
-      var row = {}
-      for (var d = 0; d < dims.length; d++) {
-        if (d+1 == dims.length) {
-          row[dims[d].name] = { 'value': 'TOTAL', 'cell_style': 'total' }
-        } else {
-          row[dims[d].name] = { 'value': '' }
-        }
-      }
-      for(var p = 0; p < pivots.length; p++) {
-        for (var m = 0; m < meas.length; m++) {
-          if (!pivots[p].is_total || typeof meas[m].is_table_calculation  == 'undefined') {
-            pivotKey = pivots[p]['key']
-            measureName = meas[m]['name']
-            cellKey = pivotKey + '.' + measureName
-            cellValue = totals[measureName][pivotKey]
-            cellValue['cell_style'] = 'total'
-            if (typeof cellValue.rendered == 'undefined' && typeof cellValue.html !== 'undefined' ){
-              rendered = parser.parseFromString(cellValue.html, 'text/html')
-              cellValue.rendered = rendered.getElementsByTagName('a')[0].innerText
-            }
-            row[cellKey] = cellValue
-          }
-        }
-      }
-    } else {
-      for (var d = 0; d < dims.length; d++) {
-        if (d+1 == dims.length) {
-          totals[dims[d].name] = { 'value': 'TOTAL' }
-        } else {
-          totals[dims[d].name] = { 'value': '' }
-        }
-      }
-      row = totals
-      
-    }
-    row['$$$_totals_$$$'] = true
-    row['$$$_sort_$$$'] = [1, 0, 0]
-    flatData.data.push(row)
-  }
-  flatData.totals = true
-  return flatData
-}
-
-const addSubTotals = function(flatData, dims, depth) {
-  subTotals = []
-  latest_grouping = []
-  for (var r = 0; r < flatData.data.length; r++) {    
-    row = flatData.data[r]
-    if(typeof row['$$$_totals_$$$'] === 'undefined') {
-      grouping = []
-      for (var g = 0; g < depth; g++) {
-        grouping.push(row[dims[g].name].value)
-      }
-      if (grouping.join('|') !== latest_grouping.join('|')) {
-        console.log(latest_grouping, grouping)
-        subTotals.push(grouping)
-        latest_grouping = grouping
-      }
-      row['$$$_sort_$$$'] = [0, subTotals.length-1, r]
-    }
-  }
-  for (var s = 0; s < subTotals.length; s++) {
-    subtotal = {}
-    for (var c = 0; c < flatData.headers.length; c++) {
-      if (c+1 == dims.length) {
-        subtotal_label = 'Total ' + subTotals[s].join(' – ') // [subTotals[s].length-1]
-        subtotal[flatData.headers[c]['header_name']] = {'value':  subtotal_label, 'cell_style': 'total'}
-      } else {
-        subtotal[flatData.headers[c]['header_name']] = ''
-      }
-    }
-    subtotal['$$$_sort_$$$'] = [0, s, 9999]
-    flatData.data.push(subtotal)
-
-    var sort_func = function(a, b) { if (a['$$$_sort_$$$'] > b['$$$_sort_$$$']) {return 1} else {return -1} }
-    flatData.data.sort(sort_func)
-  }
-  console.log('subTotals', subTotals)
 }
 
 looker.plugins.visualizations.add({
@@ -320,16 +352,9 @@ looker.plugins.visualizations.add({
     new_options = getNewConfigOptions(config, fields);
     this.trigger("registerOptions", new_options);
 
-    flatData = buildFlatData(data, queryResponse)
-
-    // var subTotalDepth = 2
-    console.log(config)
-    console.log(config.subtotalDepth)
-    addSubTotals(flatData, queryResponse.fields.dimension_like, config.subtotalDepth)
-
-    buildVis(flatData);
-
-    console.log(flatData)
+    flatDataObject = new FlatData(data, queryResponse)
+    flatDataObject.addSubTotals(config.subtotalDepth)
+    buildVis(flatDataObject);
     
     done();
   }
