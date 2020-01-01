@@ -81,10 +81,15 @@ class FlatData {
       var row = new Row('line_item')
 
       // DIMENSIONS
+      var row_index = []
       for (var d = 0; d < this.dims.length; d++) {
         var dim = this.dims[d].name
         row.data[dim] = lookerData[i][dim]
+        row_index.push(lookerData[i][dim].value)
       }
+      var idx = this.number_of_dimensions - 1
+      var final_value = lookerData[i][this.dims[idx].name].value
+      row.data['$$$_index_$$$'] = { 'value': '___' + final_value }
 
       if (pivots.length > 0) {
         // PIVOTED MEASURES
@@ -124,6 +129,7 @@ class FlatData {
 
       if (pivots.length > 0) {
         var row = new Row('total')
+        row.data['$$$_index_$$$'] = { 'value': 'TOTAL', cell_style: "total" }
         // DIMENSIONS
         for (var d = 0; d < this.dims.length; d++) {
           if (d+1 == this.dims.length) {
@@ -175,11 +181,14 @@ class FlatData {
       row.sort = [1, 0, 0]
       this.data.push(row)
       this.totals = true
+      console.log('totals row', row)
     }
   }
 
   addSubTotals (depth) { // (flatData, dims, depth) {
     if (typeof depth === 'undefined') { depth = this.number_of_dimensions - 1 }
+
+    // BUILD GROUPINGS / SORT VALUES
     var subTotals = []
     var latest_grouping = []
     for (var r = 0; r < this.data.length; r++) {    
@@ -197,6 +206,8 @@ class FlatData {
         row.sort = [0, subTotals.length-1, r]
       }
     }
+
+    // GENERATE DATA ROWS FOR SUBTOTALS
     for (var s = 0; s < subTotals.length; s++) {
       var subtotal = new Row('subtotal')
       for (var c = 0; c < this.columns.length; c++) {
@@ -207,6 +218,7 @@ class FlatData {
           subtotal.data[this.columns[c]['id']] = ''
         }
       }
+      subtotal.data['$$$_index_$$$'] = { 'value': subtotal_label, 'cell_style': 'total'}
       subtotal.sort = [0, s, 9999]
       this.data.push(subtotal)
     }
@@ -219,6 +231,22 @@ class FlatData {
     }
     this.data.sort(compare_sort_values)
     this.subtotals = true
+  }
+
+  headers (index_column=false) {
+    if (index_column) {
+      var index_dimension = {
+        'id': '$$$_index_$$$',
+        'field': {
+          'label': 'Index',
+          'align': 'left'
+        }
+      }
+      var non_dimensions = this.columns.slice(this.number_of_dimensions)
+      return [index_dimension].concat(non_dimensions)
+    } else {
+      return this.columns
+    }
   }
 
   raw() {
@@ -304,21 +332,7 @@ const getNewConfigOptions = function(config, fields) {
   return newOptions
 }
 
-const getHeaders = function(flatData, config, queryResponse) {
-  if (config.singleDimensionColumn) {
-    non_dimensions = flatData.columns.splice(queryResponse.fields.dimension_like.length)
-    single_dimension = {
-      'id': 'single_dimension',
-      'label': 'Single Dimension',
-      'align': 'left',
-    }
-    return [single_dimension].concat(non_dimensions)
-  } else {
-    return flatData.columns
-  }
-}
-
-const buildVis = function(flatData) {
+const buildReportTable = function(flatData, index_column=false) {
 
   var table = d3.select('#visContainer')
     .append('table')
@@ -327,7 +341,7 @@ const buildVis = function(flatData) {
   // create table header
   table.append('thead').append('tr')
     .selectAll('th')
-    .data(flatData.columns).enter()
+    .data(flatData.headers(index_column)).enter()
     .append('th')
     .text(d => d.id);
   
@@ -339,7 +353,8 @@ const buildVis = function(flatData) {
     .append('tr')
     .selectAll('td')
     .data(function(row) {
-      return flatData.columns.map(function(column) {
+      console.log('columns', flatData.headers(index_column));
+      return flatData.headers(index_column).map(function(column) {
         var cell = row.data[column.id]
         cell.align = column.field.align
         return cell;
@@ -347,9 +362,6 @@ const buildVis = function(flatData) {
     }).enter()
     .append('td')
     .text(d => d.rendered || d.value)
-    // .attr('class', d => d.align)
-    // // .classed(function (d) {return d.align}, true)
-    // .classed('total', d => typeof d.cell_style !== 'undefined')
     .attr('class', d => {
       classes = []
       classes.push(d.align)
@@ -404,10 +416,8 @@ looker.plugins.visualizations.add({
 
     flatData = new FlatData(data, queryResponse)
     flatData.addSubTotals(config.subtotalDepth)
-    buildVis(flatData);
-
     console.log(flatData)
-    console.log(flatData.raw())
+    buildReportTable(flatData, true);
     
     done();
   }
