@@ -15,7 +15,21 @@ const loadStylesheets = () => {
   addCSS('https://jwtest.ngrok.io/report_table/report_table.css');
 };
 
-const options = {}
+const options = {
+  subtotalDepth: {
+    section: "Subtotals",
+    type: "number",
+    label: "Sub Total Depth",
+    default: 1
+  },
+  singleDimensionColumn: {
+    section: "Subtotals",
+    type: "boolean",
+    label: "Single Dimension Column",
+    // display_size: 'third',
+    default: "false",
+  }
+}
 
 const getNewConfigOptions = function(config, fields) {
   newOptions = options;
@@ -28,19 +42,27 @@ const getNewConfigOptions = function(config, fields) {
       order: i * 10,
     }
 
-    newOptions['option_a|' + fields[i].name] = {
+    newOptions['hide|' + fields[i].name] = {
       section: "Columns",
       type: "boolean",
-      label: 'Option A', // fields[i].name,
-      display_size: 'half',
+      label: 'Hide', // fields[i].name,
+      display_size: 'third',
       order: i * 10 + 1,
     }
 
-    newOptions['option_b|' + fields[i].name] = {
+    newOptions['var_num|' + fields[i].name] = {
       section: "Columns",
       type: "boolean",
-      label: 'Option B', // fields[i].name,
-      display_size: 'half',
+      label: 'Var #', // fields[i].name,
+      display_size: 'third',
+      order: i * 10 + 2,
+    }
+
+    newOptions['var_pct|' + fields[i].name] = {
+      section: "Columns",
+      type: "boolean",
+      label: 'Var %', // fields[i].name,
+      display_size: 'third',
       order: i * 10 + 2,
     }
 
@@ -166,7 +188,7 @@ const buildFlatData = function(data, queryResponse) {
         row[supers[s].name] = data[i][supers[s].name]
       }
     }
-
+    row['$$$_sort_$$$'] = [0, 0, i]
     flatData.data.push(row)
   }
 
@@ -176,7 +198,11 @@ const buildFlatData = function(data, queryResponse) {
     if (pivots.length > 0) {
       var row = {}
       for (var d = 0; d < dims.length; d++) {
-        row[dims[d].name] = { 'value': '' }
+        if (d+1 == dims.length) {
+          row[dims[d].name] = { 'value': 'TOTAL', 'cell_style': 'total' }
+        } else {
+          row[dims[d].name] = { 'value': '' }
+        }
       }
       for(var p = 0; p < pivots.length; p++) {
         for (var m = 0; m < meas.length; m++) {
@@ -194,23 +220,26 @@ const buildFlatData = function(data, queryResponse) {
           }
         }
       }
-      row['$$$_totals_$$$'] = true
-      flatData.data.push(row)
     } else {
       for (var d = 0; d < dims.length; d++) {
-        totals[dims[d].name] = { 'value': '' }
+        if (d+1 == dims.length) {
+          totals[dims[d].name] = { 'value': 'TOTAL' }
+        } else {
+          totals[dims[d].name] = { 'value': '' }
+        }
       }
-      row = { ...{'$$$_totals_$$$': true}, ...totals}
-      flatData.data.push(row)
+      row = totals
+      
     }
+    row['$$$_totals_$$$'] = true
+    row['$$$_sort_$$$'] = [1, 0, 0]
+    flatData.data.push(row)
   }
   flatData.totals = true
   return flatData
 }
 
 const addSubTotals = function(flatData, dims, depth) {
-  console.log('Processing subtotals to depth 2')
-
   subTotals = []
   latest_grouping = []
   for (var r = 0; r < flatData.data.length; r++) {    
@@ -225,7 +254,24 @@ const addSubTotals = function(flatData, dims, depth) {
         subTotals.push(grouping)
         latest_grouping = grouping
       }
+      row['$$$_sort_$$$'] = [0, subTotals.length-1, r]
     }
+  }
+  for (var s = 0; s < subTotals.length; s++) {
+    subtotal = {}
+    for (var c = 0; c < flatData.headers.length; c++) {
+      if (c+1 == dims.length) {
+        subtotal_label = 'Total ' + subTotals[s].join(' – ') // [subTotals[s].length-1]
+        subtotal[flatData.headers[c]['header_name']] = {'value':  subtotal_label, 'cell_style': 'total'}
+      } else {
+        subtotal[flatData.headers[c]['header_name']] = ''
+      }
+    }
+    subtotal['$$$_sort_$$$'] = [0, s, 9999]
+    flatData.data.push(subtotal)
+
+    var sort_func = function(a, b) { if (a['$$$_sort_$$$'] > b['$$$_sort_$$$']) {return 1} else {return -1} }
+    flatData.data.sort(sort_func)
   }
   console.log('subTotals', subTotals)
 }
@@ -276,8 +322,10 @@ looker.plugins.visualizations.add({
 
     flatData = buildFlatData(data, queryResponse)
 
-    var subTotalsDepth = 2
-    addSubTotals(flatData, queryResponse.fields.dimension_like, subTotalsDepth)
+    // var subTotalDepth = 2
+    console.log(config)
+    console.log(config.subtotalDepth)
+    addSubTotals(flatData, queryResponse.fields.dimension_like, config.subtotalDepth)
 
     buildVis(flatData);
 
