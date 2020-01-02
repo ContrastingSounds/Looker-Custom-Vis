@@ -47,17 +47,3 @@ table.reportTable td {
   border-top: 2px solid #000000 !important;
   font-weight: bold !important;
 }
-
-.primary {
-  border: 1px solid #CCCCCC;
-  background: #E60000;
-  font-weight: bold;
-  color: #FFFFFF;
-}
-
-.secondary {
-  border: 1px solid #CCCCCC;
-  background: #AAAAAA;
-  font-weight: normal;
-  color: #FFFFFF;
-}

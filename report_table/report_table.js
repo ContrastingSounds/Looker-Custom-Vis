@@ -1,8 +1,5 @@
 /* Dependency: https://cdnjs.cloudflare.com/ajax/libs/d3/5.15.0/d3.min.js */
 
-// TODO: update flatData.data so that each row has a single_dimension value
-// TODO: update table building to handle singleDimensionColumn option
-
 debug = false;
 
 class Row {
@@ -20,23 +17,31 @@ class Column {
   }
 }
 
-class FlatData {
+class LookerData {
   constructor(lookerData, queryResponse) {
     this.columns = []
     this.data = []
     this.dims = queryResponse.fields.dimension_like
+    this.meas = queryResponse.fields.measure_like
+    this.supers = []
+    this.pivots = queryResponse.pivots
     this.number_of_dimensions = this.dims.length
     this.totals = false
     this.subtotals = false
+    this.has_pivots = false
+    this.has_supers = false
 
-    var meas = queryResponse.fields.measure_like
-    var pivots = queryResponse.pivots
-    if (typeof queryResponse.pivots !== 'undefined') {
-      pivots = queryResponse.pivots
+    // var meas = queryResponse.fields.measure_like
+    // var pivots = queryResponse.pivots
+    // if (typeof queryResponse.pivots !== 'undefined') {
+    if (this.pivots.length > 0) {
+      // this.pivots = queryResponse.pivots
+      this.has_pivots = true
     }
-    var supers = []
+
     if (typeof queryResponse.fields.supermeasure_like !== 'undefined') {
-      supers = queryResponse.fields.supermeasure_like
+      this.supers = queryResponse.fields.supermeasure_like
+      this.has_supers = true
     }
 
     // BUILD COLUMNS
@@ -47,30 +52,30 @@ class FlatData {
       column.field = this.dims[d]
       this.columns.push(column)
     }
-    if (pivots.length > 0) {
-      for(var p = 0; p < pivots.length; p++) {
-        for (var m = 0; m < meas.length; m++) {
-          if (typeof meas[m].is_table_calculation === 'undefined') {
-            var pivotKey = pivots[p]['key']
-            var measureName = meas[m]['name']
+    if (this.has_pivots) {
+      for(var p = 0; p < this.pivots.length; p++) {
+        for (var m = 0; m < this.meas.length; m++) {
+          if (typeof this.meas[m].is_table_calculation === 'undefined') {
+            var pivotKey = this.pivots[p]['key']
+            var measureName = this.meas[m]['name']
             var columnId = pivotKey + '.' + measureName
             var column = new Column(columnId)
-            column.field = meas[m]
+            column.field = this.meas[m]
             this.columns.push(column)
           }
         }
       }
     } else {
-      for (var m = 0; m < meas.length; m++) {
-        var column = new Column(meas[m].name)
-        column.field = meas[m]
+      for (var m = 0; m < this.meas.length; m++) {
+        var column = new Column(this.meas[m].name)
+        column.field = this.meas[m]
         this.columns.push(column)
       }
     }
-    if (supers.length > 0) {
-      for (var s = 0; s < supers.length; s++) {
-        var column = new Column(supers[s].name)
-        column.field = supers[s]
+    if (this.has_supers) {
+      for (var s = 0; s < this.supers.length; s++) {
+        var column = new Column(this.supers[s].name)
+        column.field = this.supers[s]
         this.columns.push(column)
       }
     }
@@ -91,13 +96,13 @@ class FlatData {
       var final_value = lookerData[i][this.dims[idx].name].value
       row.data['$$$_index_$$$'] = { 'value': final_value, 'cell_style': 'indent' }
 
-      if (pivots.length > 0) {
+      if (this.has_pivots) {
         // PIVOTED MEASURES
-        for(var p = 0; p < pivots.length; p++) {
-          for (var m = 0; m < meas.length; m++) {
-            if (!pivots[p].is_total || typeof meas[m].is_table_calculation  == 'undefined') {
-              var pivotKey = pivots[p]['key']
-              var measureName = meas[m]['name']
+        for(var p = 0; p < this.pivots.length; p++) {
+          for (var m = 0; m < this.meas.length; m++) {
+            if (!this.pivots[p].is_total || typeof this.meas[m].is_table_calculation  == 'undefined') {
+              var pivotKey = this.pivots[p]['key']
+              var measureName = this.meas[m]['name']
               var cellKey = pivotKey + '.' + measureName
               var cellValue = lookerData[i][measureName][pivotKey]
               row.data[cellKey] = cellValue
@@ -106,15 +111,15 @@ class FlatData {
         }
       } else {
         // MEASURES
-        for (var m = 0; m < meas.length; m++) {
-          var mea = meas[m].name
+        for (var m = 0; m < this.meas.length; m++) {
+          var mea = this.meas[m].name
           row.data[mea] = lookerData[i][mea] 
         }
       }
       // SUPERMEASURES
-      if (supers.length > 0) {
-        for (var s = 0; s < supers.length; s++) {
-          var super_ = supers[s].name
+      if (this.has_supers) {
+        for (var s = 0; s < this.supers.length; s++) {
+          var super_ = this.supers[s].name
           row.data[super_] = lookerData[i][super_]
         }
       }
@@ -127,7 +132,7 @@ class FlatData {
       var parser = new DOMParser()
       var totals_ = queryResponse.totals_data
 
-      if (pivots.length > 0) {
+      if (this.has_pivots) {
         var row = new Row('total')
         row.data['$$$_index_$$$'] = { 'value': 'TOTAL', cell_style: 'total' }
         // DIMENSIONS
@@ -139,11 +144,11 @@ class FlatData {
           }
         }
         // MEASURES
-        for(var p = 0; p < pivots.length; p++) {
-          for (var m = 0; m < meas.length; m++) {
-            if (!pivots[p].is_total || typeof meas[m].is_table_calculation  == 'undefined') {
-              var pivotKey = pivots[p]['key']
-              var measureName = meas[m]['name']
+        for(var p = 0; p < this.pivots.length; p++) {
+          for (var m = 0; m < this.meas.length; m++) {
+            if (!this.pivots[p].is_total || typeof this.meas[m].is_table_calculation  == 'undefined') {
+              var pivotKey = this.pivots[p]['key']
+              var measureName = this.meas[m]['name']
               var cellKey = pivotKey + '.' + measureName
               var cellValue = totals_[measureName][pivotKey]
               cellValue['cell_style'] = 'total'
@@ -160,9 +165,9 @@ class FlatData {
           }
         }
         // SUPERMEASURES
-        if (supers.length > 0) {
-          for (var s = 0; s < supers.length; s++) {
-            var super_ = supers[s].name
+        if (this.has_supers) {
+          for (var s = 0; s < this.supers.length; s++) {
+            var super_ = this.supers[s].name
             row.data[super_] = totals_[super_]
             row.data[super_].cell_style = 'total'
           }
@@ -185,7 +190,7 @@ class FlatData {
     }
   }
 
-  addSubTotals (depth) { // (flatData, dims, depth) {
+  addSubTotals (depth) { // (lookerData, dims, depth) {
     if (typeof depth === 'undefined') { depth = this.number_of_dimensions - 1 }
 
     // BUILD GROUPINGS / SORT VALUES
@@ -210,14 +215,44 @@ class FlatData {
     // GENERATE DATA ROWS FOR SUBTOTALS
     for (var s = 0; s < subTotals.length; s++) {
       var subtotal = new Row('subtotal')
-      for (var c = 0; c < this.columns.length; c++) {
-        if (c+1 == this.dims.length) {
-          var subtotal_label = 'Total ' + subTotals[s].join(' – ') // [subTotals[s].length-1]
-          subtotal.data[this.columns[c]['id']] = {'value':  subtotal_label, 'cell_style': 'total'}
+      // DIMENSIONS
+      for (var d = 0; d < this.columns.length; d++) {
+        if (d+1 == this.dims.length) {
+          var subtotal_label = subTotals[s].join(' | ') // [subTotals[s].length-1]
+          subtotal.data[this.columns[d]['id']] = {'value':  subtotal_label, 'cell_style': 'total'}
         } else {
-          subtotal.data[this.columns[c]['id']] = ''
+          subtotal.data[this.columns[d]['id']] = ''
         }
       }
+
+      // MEASURES
+      if (this.has_pivots) { // Pivoted measures, skipping table_calculations for row totals
+        for(var p = 0; p < this.pivots.length; p++) {
+          for (var m = 0; m < this.meas.length; m++) {
+            if (!this.pivots[p].is_total || typeof this.meas[m].is_table_calculation  == 'undefined') {
+              var pivotKey = this.pivots[p]['key']
+              var measureName = this.meas[m]['name']
+              var cellKey = pivotKey + '.' + measureName
+              var cellValue = {'value': 'TBD', 'cell_style': 'total'}
+              subtotal.data[cellKey] = cellValue
+            }
+          }
+        }
+      } else {
+        for (var m = 0; m < this.meas.length; m++) {
+          var mea = this.meas[m].name
+          subtotal.data[mea] = {'value': 'TBD', 'cell_style': 'total'}
+        }
+      }
+
+      // SUPERMEASURES
+      if (this.has_supers) {
+        for (var s_ = 0; s_ < this.supers.length; s_++) {
+          var super_ = this.supers[s_].name
+          subtotal.data[super_] = {'value': 'TBD', 'cell_style': 'total'}
+        }
+      }
+
       subtotal.data['$$$_index_$$$'] = { 'value': subtotal_label, 'cell_style': 'total'}
       subtotal.sort = [0, s, 9999]
       this.data.push(subtotal)
@@ -284,10 +319,10 @@ const options = {
     label: "Sub Total Depth",
     default: 1
   },
-  singleDimensionColumn: {
+  indexColumn: {
     section: "Subtotals",
     type: "boolean",
-    label: "Single Dimension Column",
+    label: "Use Index Dimension",
     // display_size: 'third',
     default: "false",
   }
@@ -332,7 +367,7 @@ const getNewConfigOptions = function(config, fields) {
   return newOptions
 }
 
-const buildReportTable = function(flatData, index_column=false) {
+const buildReportTable = function(lookerData, index_column=false) {
 
   var table = d3.select('#visContainer')
     .append('table')
@@ -341,7 +376,7 @@ const buildReportTable = function(flatData, index_column=false) {
   // create table header
   table.append('thead').append('tr')
     .selectAll('th')
-    .data(flatData.headers(index_column)).enter()
+    .data(lookerData.headers(index_column)).enter()
     .append('th')
     .text(d => d.id);
   
@@ -349,11 +384,11 @@ const buildReportTable = function(flatData, index_column=false) {
   // create table body
   table.append('tbody')
     .selectAll('tr')
-    .data(flatData.data).enter()
+    .data(lookerData.data).enter()
     .append('tr')
     .selectAll('td')
     .data(function(row) {
-      return flatData.headers(index_column).map(function(column) {
+      return lookerData.headers(index_column).map(function(column) {
         var cell = row.data[column.id]
         cell.align = column.field.align
         return cell;
@@ -365,7 +400,6 @@ const buildReportTable = function(flatData, index_column=false) {
       classes = []
       if (typeof d.align !== 'undefined') { classes.push(d.align) }
       if (typeof d.cell_style !== 'undefined') { 
-        if (d.cell_style == 'indent') {console.log('INDENT!')}
         var styles = d.cell_style.split(' ')
         classes = classes.concat(styles) 
       }
@@ -418,10 +452,10 @@ looker.plugins.visualizations.add({
     new_options = getNewConfigOptions(config, fields);
     this.trigger("registerOptions", new_options);
 
-    flatData = new FlatData(data, queryResponse)
-    flatData.addSubTotals(config.subtotalDepth)
-    console.log(flatData)
-    buildReportTable(flatData, true);
+    lookerData = new LookerData(data, queryResponse)
+    lookerData.addSubTotals(config.subtotalDepth)
+    console.log(lookerData)
+    buildReportTable(lookerData, config.indexColumn);
     
     done();
   }

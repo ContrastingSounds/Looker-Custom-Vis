@@ -33,3 +33,50 @@
   - https://bl.ocks.org/mph006/20f76a764fd5ed2ff37f
   - https://github.com/DKirwan/reusable-d3-sparkline
   - http://prag.ma/code/sparky/
+
+
+## Building a row
+
+1. Create row
+2. Dimensions
+3. Measures 
+   - if flat
+     - else pivots
+5. Supermeasures
+
+#### Create row
+    var row = new Row(type) // type: line_item | subtotal | total
+
+#### Dimensions
+    for (var d = 0; d < this.dims.length; d++) {
+      var dim = this.dims[d].name
+      row.data[dim] = // calculate cell value
+    }
+
+#### Measures
+    if (this.has_pivots) { // Pivoted measures, skipping table_calculations for row totals
+      for(var p = 0; p < this.pivots.length; p++) {
+        for (var m = 0; m < meas.length; m++) {
+          if (!this.pivots[p].is_total || typeof meas[m].is_table_calculation  == 'undefined') {
+            var pivotKey = this.pivots[p]['key']
+            var measureName = meas[m]['name']
+            var cellKey = pivotKey + '.' + measureName
+            var cellValue = // calculate cell value
+            row.data[cellKey] = cellValue
+          }
+        }
+      } else { // Flat table measures
+        for (var m = 0; m < this.meas.length; m++) {
+          var mea = this.meas[m].name
+          row.data[mea] = // calculate cell value 
+        }
+      }
+    }
+
+#### Supermeasures
+    if (this.has_supers) {
+      for (var s = 0; s < this.supers.length; s++) {
+        var super_ = this.supers[s].name
+        row.data[super_] = // calculate cell value
+      }
+    }
