@@ -8,6 +8,8 @@
   - Add the subtotal rows
   - Have a single dimension column, appropriately indented for line items / subtotals / totals
   - Have a single dimension column, appropriately bolded/capitalised for line items / subtotals / totals
+
+
   - Colspans/multiple headers for pivots
   - Option to put total at top or bottom
   - Option to put subtotals above or below rows
@@ -34,8 +36,37 @@
   - https://github.com/DKirwan/reusable-d3-sparkline
   - http://prag.ma/code/sparky/
 
+## Cell merge in dimensions
 
-## Building a row
+- cell merge option
+- ? cell merge depth - use subTotalDepth value
+- do not merge across subtotals
+
+Data structure
+- this.rowspan_values { row_index: { dimension: span_value} }
+
+Building rowspan_values
+- init rowspan_value (this.rowspan_values = {})
+- init span_tracker (var span_tracker = {})
+- loop backwards through the data rows
+  - if total or subtotal, full_reset and continue
+    FULL RESET: for each dim, span_tracker.dim = 1, continue
+  - loop forwards through the dimensions
+    - MATCH: if the dimension value is same as previous, increment the tracker and set cell to hidden
+      INCREMENT: for current dimension, span_tracker.dim += 1, this.row_span_values[row_index][dimension] = -1
+    - NEW VALUE: if the dimension value is different to previous, reset this and following cells, and continue to next row
+      PARTIAL RESET: for current and subsequent dimensions, span_tracker.dim = 1
+
+Rendering table - getRows() to replace getHeaders()
+- getRows(index_column=false, row_index)
+  - this.columns.filter
+    - if index_column==true, either measure or $$$_index_$$$
+    - else NOT $$$_index_$$$
+    - .filter
+      - this.row_span_values[row_index][column.id] > 0
+
+
+## Building a row (CHANGED: now can do single run through the columns)
 
 1. Create row
 2. Dimensions

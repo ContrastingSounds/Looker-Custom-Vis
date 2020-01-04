@@ -4,6 +4,7 @@ const formatter = d3.format(",.2f")
 
 class Row {
   constructor(type) {
+    this.id = ''
     this.type = type
     this.sort = []
     this.data = {}
@@ -14,14 +15,23 @@ class Column {
   constructor(id) {
     this.id = id
     this.levels = []
-    this.field = {}
+    this.field = {} // Looker field definition
+    this.type = '' // dimension | measure
+    this.pivoted = false
+    this.super = false
+    this.pivot_key = ''
+    this.measure_name = ''
+    this.align = '' // left | center | right
   }
 }
 
 class LookerData {
   constructor(lookerData, queryResponse) {
-    this.alt_columns = []
-    this.alt_data = []
+    this.columns = []
+    this.dimensions = []
+    this.measures = []
+    this.data = []
+    this.rowspan_values = {}
 
     this.pivots = []
     this.number_of_pivots = queryResponse.fields.pivots.length
@@ -39,15 +49,14 @@ class LookerData {
       this.has_supers = true
     }
 
-    // ALT COLUMN ARRAY ///////////////////////////////////////////////////
-    var alt_index_column = new Column('$$$_index_$$$')
-    alt_index_column.align = 'left'
-    var alt_index_levels = ['$$$_index_$$$']
-    for (var p = 0; p < queryResponse.fields.pivots.length-1; p++) { alt_index_levels.push('') }
-    alt_index_column.levels = alt_index_levels
-    this.alt_columns.push(alt_index_column)
+    // BUILD COLUMN INDEX ///////////////////////////////////////////////////
+    var index_column = new Column('$$$_index_$$$')
+    index_column.align = 'left'
+    var index_levels = ['$$$_index_$$$']
+    for (var p = 0; p < queryResponse.fields.pivots.length-1; p++) { index_levels.push('') }
+    index_column.levels = index_levels
+    this.columns.push(index_column)
 
-    this.dimensions = []
     for (var d = 0; d < queryResponse.fields.dimension_like.length; d++) {
       var column_name = queryResponse.fields.dimension_like[d].name
       this.dimensions.push(column_name)
@@ -59,10 +68,9 @@ class LookerData {
       column.type = 'dimension'
       column.pivoted = false
       column.super = false
-      this.alt_columns.push(column)
+      this.columns.push(column)
     }
 
-    this.measures = []
     for (var m = 0; m < queryResponse.fields.measure_like.length; m++) {
       this.measures.push(queryResponse.fields.measure_like[m].name)
     }
@@ -87,7 +95,7 @@ class LookerData {
             column.super = false
             column.pivot_key = pivotKey
             column.measure_name = measureName
-            this.alt_columns.push(column)
+            this.columns.push(column)
           }
         }
       }
@@ -98,7 +106,7 @@ class LookerData {
         column.type = 'measure'
         column.pivoted = false
         column.super = false
-        this.alt_columns.push(column)
+        this.columns.push(column)
       }
     }
     
@@ -107,8 +115,7 @@ class LookerData {
       for (var s = 0; s < queryResponse.fields.supermeasure_like.length; s++) {
         var column_name = queryResponse.fields.supermeasure_like[s].name
         this.measures.push(column_name)
-      // }
-      // for (var s = 0; s < this.supermeasures.length; s++) {
+
         var column = new Column(column_name)
         var levels = [column_name]
         for (var p = 0; p < queryResponse.fields.pivots.length-1; p++) { levels.push('') }
@@ -117,17 +124,17 @@ class LookerData {
         column.type = 'measure'
         column.pivoted = false
         column.super = true
-        this.alt_columns.push(column)
+        this.columns.push(column)
       }
     }
 
-    // ALT BUILD ROWS
+    // BUILD ROWS
     //
     for (var i = 0; i < lookerData.length; i++) {
       var row = new Row('line_item')
       
-      for (var c = 0; c < this.alt_columns.length; c++) {
-        var column = this.alt_columns[c]
+      for (var c = 0; c < this.columns.length; c++) {
+        var column = this.columns[c]
         if (column.pivoted) {
           row.data[column.id] = lookerData[i][column.measure_name][column.pivot_key]
         } else {
@@ -135,22 +142,30 @@ class LookerData {
         }
       }
 
+      // Set Row Id
+      var all_dims = []
+      for (var d = 0; d < this.dimensions.length; d++) {
+        all_dims.push(lookerData[i][this.dimensions[d]].value)
+      }
+      row.id = all_dims.join('|')
+
+      // Set Index Dimension value (note: this is the index for display purposes, while row.id is the unique reference)
       var last_dim = this.dimensions[this.dimensions.length - 1]
       var last_dim_value = lookerData[i][last_dim].value
       row.data['$$$_index_$$$'] = { 'value': last_dim_value, 'cell_style': 'indent' }
 
       row.sort = [0, 0, i]
-      this.alt_data.push(row)
+      this.data.push(row)
     }
   
-    // ALT BUILD TOTALS
+    // BUILD TOTALS
     if (typeof queryResponse.totals_data !== 'undefined') {
-      var parser = new DOMParser()
+      // var parser = new DOMParser()
       var totals_ = queryResponse.totals_data
       var totals_row = new Row('total')
 
-      for (var c = 0; c < this.alt_columns.length; c++) {
-        var column = this.alt_columns[c]
+      for (var c = 0; c < this.columns.length; c++) {
+        var column = this.columns[c]
         totals_row.data[column.id] = { 'value': '' } // set a default on all columns
 
         if (column.id == this.dimensions[this.dimensions.length-1]) {
@@ -162,13 +177,8 @@ class LookerData {
             var cellKey = [column.pivot_key, column.measure_name].join('.')
             var cellValue = totals_[column.measure_name][column.pivot_key]
             cellValue.cell_style = 'total'
-            if (typeof 
-              cellValue.rendered == 'undefined' 
-              && typeof cellValue.html !== 'undefined'
-              && cellValue.html != ''
-            ){
-              var rendered = parser.parseFromString(cellValue.html, 'text/html')
-              cellValue.rendered = rendered.getElementsByTagName('a')[0].innerText
+            if (typeof cellValue.rendered == 'undefined' && typeof cellValue.html !== 'undefined' ){
+              cellValue.rendered = this.getRenderedFromHtml(cellValue)
             }
             totals_row.data[cellKey] = cellValue
           } else {
@@ -180,44 +190,114 @@ class LookerData {
       totals_row.sort = [1, 0, 0]
       totals_row.data['$$$_index_$$$'] = { 'value': 'TOTAL', cell_style: 'total' }
 
-      this.alt_data.push(totals_row)
+      this.data.push(totals_row)
       this.has_totals = true
+    }
+
+    // BUILD ROW SPANS
+    this.updateRowSpanValues()
+ 
+  }
+
+  updateRowSpanValues () {
+    var span_tracker = {}
+    // loop backwards through data rows
+    for (var r = this.data.length-1; r >= 0 ; r--) {
+      var row = this.data[r]
+      console.log('row type', row.type)
+
+      // full reset and continue for totals
+      if (row.type !== 'line_item' ) {
+        console.log('TOTAL – resetting span_tracker')
+        for (d = 0; d < this.dimensions.length; d++) {
+          span_tracker[this.dimensions[d]] = 1
+        }
+        continue;
+      }
+
+      // loop fowards through the dimensions
+      console.log('Processing row', row.id)
+      this.rowspan_values[row.id] = {}
+      for (var d = 0; d < this.dimensions.length; d++) {
+        var dim = this.dimensions[d]
+        console.log('...dimension:', dim)
+
+        // get value for this cell and one above (if available) 
+        var this_cell_value = this.data[r].data[dim].value
+        console.log('......current cell', this_cell_value)
+        if (r > 0) {
+          var cell_above_value = this.data[r-1].data[dim].value
+          console.log('......  above cell', cell_above_value)
+        }
+
+        // increment the span_tracker if dimensions match
+        if (r > 0 && this_cell_value == cell_above_value) {
+          console.log('......INCREMENT')
+          this.rowspan_values[row.id][this.dimensions[d]] = -1;
+          span_tracker[dim] += 1;
+          console.log('updated rowspan_values', this.rowspan_values[row.id])
+          console.log('updated span_tracker  ', span_tracker)
+        } else {
+        // partial reset and continue if dimensions different
+          console.log('......PARTIAL RESET')
+          for (var d_ = d; d_ < this.dimensions.length; d_++) {
+            var dim_ = this.dimensions[d_]
+            this.rowspan_values[row.id][dim_] = span_tracker[dim_];
+            span_tracker[dim_] = 1
+          }
+          console.log('updated rowspan_values', this.rowspan_values[row.id])
+          console.log('updated span_tracker  ', span_tracker)
+          break;
+        }
+      }
     }
   }
 
-  addSubTotals (depth) { // (lookerData, dims, depth) {
+  sortData () {
+    var compare_sort_values = (a, b) => {
+      for(var i=0; i<3; i++) {
+          if (a.sort[i] > b.sort[i]) { return 1 }
+          if (a.sort[i] < b.sort[i]) { return -1 }
+      }
+      return -1
+    }
+    this.data.sort(compare_sort_values)
+    this.updateRowSpanValues()
+  }
+
+  addSubTotals (depth) { 
     if (typeof depth === 'undefined') { depth = this.dimensions.length - 1 }
 
-    // ALT BUILD GROUPINGS / SORT VALUES
-    var alt_subTotals = []
-    var alt_latest_grouping = []
-    for (var r = 0; r < this.alt_data.length; r++) {    
-      var row = this.alt_data[r]
+    // BUILD GROUPINGS / SORT VALUES
+    var subTotals = []
+    var latest_grouping = []
+    for (var r = 0; r < this.data.length; r++) {    
+      var row = this.data[r]
       if (row.type !== 'total') {
         var grouping = []
         for (var g = 0; g < depth; g++) {
           var dim = this.dimensions[g]
           grouping.push(row.data[dim].value)
         }
-        if (grouping.join('|') !== alt_latest_grouping.join('|')) {
-          alt_subTotals.push(grouping)
-          alt_latest_grouping = grouping
+        if (grouping.join('|') !== latest_grouping.join('|')) {
+          subTotals.push(grouping)
+          latest_grouping = grouping
         }
-        row.sort = [0, alt_subTotals.length-1, r]
+        row.sort = [0, subTotals.length-1, r]
       }
     }
 
-    // ALT GENERATE DATA ROWS FOR SUBTOTALS
-    for (var s = 0; s < alt_subTotals.length; s++) {
+    // GENERATE DATA ROWS FOR SUBTOTALS
+    for (var s = 0; s < subTotals.length; s++) {
       var subtotal = new Row('subtotal')
 
-      for (var d = 0; d < this.alt_columns.length; d++) {
-        var column = this.alt_columns[d]
+      for (var d = 0; d < this.columns.length; d++) {
+        var column = this.columns[d]
         subtotal.data[column.id] = '' // set default
 
-        if (this.alt_columns[d].id === '$$$_index_$$$' || d === this.dimensions.length ) {
-          var subtotal_label = alt_subTotals[s].join(' | ')
-          subtotal.data[this.alt_columns[d]['id']] = {'value':  subtotal_label, 'cell_style': 'total'}
+        if (this.columns[d].id === '$$$_index_$$$' || d === this.dimensions.length ) {
+          var subtotal_label = subTotals[s].join(' | ')
+          subtotal.data[this.columns[d]['id']] = {'value':  subtotal_label, 'cell_style': 'total'}
         } 
 
         if (column.type == 'measure') {
@@ -227,8 +307,8 @@ class LookerData {
           } else {
             var cellKey = column.id
           }
-          for (var mr = 0; mr < this.alt_data.length; mr++) {
-            var data_row = this.alt_data[mr]
+          for (var mr = 0; mr < this.data.length; mr++) {
+            var data_row = this.data[mr]
             if (data_row.type == 'line_item' && data_row.sort[1] == s) {
               subtotal_value += data_row.data[cellKey].value
             } 
@@ -238,71 +318,75 @@ class LookerData {
         }
       }
       subtotal.sort = [0, s, 9999]
-      this.alt_data.push(subtotal)
+      this.data.push(subtotal)
     }
-    var compare_sort_values = (a, b) => {
-      for(var i=0; i<3; i++) {
-          if (a.sort[i] > b.sort[i]) { return 1 }
-          if (a.sort[i] < b.sort[i]) { return -1 }
-      }
-      return -1
-    }
-    this.alt_data.sort(compare_sort_values)
+    this.sortData()
     this.has_subtotals = true
   }
 
-  getLevels () {
-    var levels = []
-    if (this.has_pivots) {
-      for (var p=0; p<this.number_of_pivots; p++) { 
-        var level = {}
-        for (var c=0; c<this.alt_columns.length; c++) {
-          var column = Object.assign({}, this.alt_columns[c])
-          column.level = p
-          if (column.field.category == 'measure') {
-            column.label = column.levels[p]
-          } else {
-            column.label = ''
-          }
-          level[column.id] = column
-        }
-        levels.push(level)
-      }
-      var level = {}
-      for (var c=0; c<this.alt_columns.length; c++) {
-        var column = Object.assign({}, this.alt_columns[c])
-        column.level = this.number_of_pivots
-        column.label = column.field.label_short || column.field.label
-        level[column.id] = column
-      }
-      levels.push(level)
+  getRenderedFromHtml (cellValue) {
+    var parser = new DOMParser()
+    // console.log('cell to renderFromHtml', cellValue)
+    if (cellValue.html !== '') {
+      var rendered = parser.parseFromString(cellValue.html, 'text/html')
+      rendered = rendered.getElementsByTagName('a')[0].innerText
     } else {
-      var level = {}
-      for (var c=0; c<this.alt_columns.length; c++) {
-        var column = Object.assign({}, this.alt_columns[c])
-        column.level = 0
-        column.label = column.field.label_short || column.field.label
-        level[column.id] = column
-      }
-      levels.push(level)
+      var rendered = cellValue.value
     }
+
+    return rendered
+  }
+
+  getLevels () {
+    var levels = [0]
+    for (var p=0; p<this.number_of_pivots; p++) { levels.push(p) } 
     return levels
   }
 
   getHeaders (index_column=false) {
     if (index_column) {
-      return this.alt_columns.filter(c => c.field.measure || c.id == '$$$_index_$$$')
+      var headers = this.columns.filter(c => c.field.measure || c.id == '$$$_index_$$$')
     } else {
-      return this.alt_columns.filter(c => c.id !== '$$$_index_$$$')
+      var headers =  this.columns.filter(c => c.id !== '$$$_index_$$$')
     }
+    console.log('getHeaders ->', headers)
+    return headers
   }
 
-  raw() {
+  // ADD getRow(index_column=false, span_rows=true) function
+  getRow (row, index_column=false, span_rows=true) {
+    // filter out unwanted dimensions based on index_column setting
+    if (index_column) {
+      var cells = this.columns.filter(c => c.field.measure || c.id == '$$$_index_$$$')
+    } else {
+      var cells =  this.columns.filter(c => c.id !== '$$$_index_$$$')
+    }
+
+    if (!index_column && span_rows) {
+    // set row spans
+      for (var cell = 0; cell < cells.length; cell++) {
+        cells[cell].rowspan = 1 // set default
+        if (row.type === 'line_item' && this.rowspan_values[row.id][cells[cell].id] > 0) {
+          cells[cell].rowspan = this.rowspan_values[row.id][cells[cell].id]
+        } 
+      }
+
+      // filter out 'hidden' cells
+      if (row.type === 'line_item') {
+        cells = cells.filter(c => c.type == 'measure' || this.rowspan_values[row.id][c.id] > 0)
+      }
+    }
+
+    console.log('getRow ->', cells)
+    return cells
+  }
+
+  getSimpleJson() {
     var raw_values = []
-    this.alt_data.forEach(r => {
+    this.data.forEach(r => {
       if (r.type === 'line_item') {
         var row = {}
-        this.alt_columns.forEach(c => {
+        this.columns.forEach(c => {
           row[c.id] = r.data[c.id].value
         })
         raw_values.push(row)
@@ -338,6 +422,13 @@ const options = {
     label: "Use Index Dimension",
     // display_size: 'third',
     default: "false",
+  },
+  spanRows: {
+    section: "Subtotals",
+    type: "boolean",
+    label: "Span Rows",
+    // display_size: 'third',
+    default: "true",
   }
 }
 
@@ -380,7 +471,7 @@ const getNewConfigOptions = function(config, fields) {
   return newOptions
 }
 
-const buildReportTable = function(lookerData, use_index_column=false) {
+const buildReportTable = function(lookerData, use_index_column=false, span_rows=true) {
 
   var table = d3.select('#visContainer')
     .append('table')
@@ -391,31 +482,36 @@ const buildReportTable = function(lookerData, use_index_column=false) {
     .data(lookerData.getLevels()).enter()
     .append('tr')
     .selectAll('th')
-    .data(function(level, i) {
+    .data(function(level, i) { 
       return lookerData.getHeaders(use_index_column).map(function(column) {
-        var header_cell = level[column.id]
-        return header_cell
+        if (i < column.levels.length && column.pivoted) {
+          return column.levels[i]
+        } else {
+          return column.field.label_short || column.field.label
+        }
       })
     }).enter()
     .append('th')
-    .text(d => d.label);
+    .text(d => d);
   
   var align = 'right'
   // create table body
   table.append('tbody')
     .selectAll('tr')
-    .data(lookerData.alt_data).enter()
+    .data(lookerData.data).enter()
     .append('tr')
     .selectAll('td')
-    .data(function(row) {
-      return lookerData.getHeaders(use_index_column).map(function(column) {
+    .data(function(row) { // CHANGE TO USER A GET ROWS FUNCTION, WHICH INCLUDES ROW SPANS 
+      return lookerData.getRow(row, use_index_column, span_rows).map(function(column) {
         var cell = row.data[column.id]
+        cell.rowspan = column.rowspan
         cell.align = column.field.aligns
         return cell;
       })
     }).enter()
     .append('td')
-      .text(d => d.rendered || d.value)
+      .text(d => d.rendered || d.value) // ADD ROW SPAN VALUE BELOW
+      .attr("rowspan", d => d.rowspan)
       .attr('class', d => {
         classes = []
         if (typeof d.align !== 'undefined') { classes.push(d.align) }
@@ -466,7 +562,7 @@ looker.plugins.visualizations.add({
     lookerData = new LookerData(data, queryResponse)
     lookerData.addSubTotals(config.subtotalDepth)
     console.log(lookerData)
-    buildReportTable(lookerData, config.indexColumn);
+    buildReportTable(lookerData, config.indexColumn, config.spanRows);
     
     done();
   }
