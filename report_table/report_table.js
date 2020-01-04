@@ -330,11 +330,114 @@ class LookerData {
     return levels
   }
 
-  getHeaders (index_column=false) {
+  // getColSpans (headers, field_at_top=true) {
+  getColSpans (headers) {
+    // build single array of the header values
+    // use column id for the first level
+    var header_levels = []
+    var span_values = []
+    var span_tracker = []
+
+    for (var h = headers.length-1; h >= 0; h--) {
+      // if (field_at_top) {
+      //   header_levels.push(headers[h].levels.concat([headers[h].field.name])) 
+      // } else {
+      //   header_levels.push([headers[h].field.name].concat(headers[h].levels))  
+      // }
+      header_levels[headers.length-1 - h] = headers[h].levels.concat([headers[h].field.name])
+      span_values[h] = []
+      for (var l = 0; l < header_levels[headers.length-1 - h].length; l++) {
+        span_values[h].push(1) // set defaults
+      }
+    }
+    console.log('header levels (reverse)', header_levels)
+
+    // init tracker
+    for (var l = 0; l < header_levels[0].length; l++) {
+      span_tracker.push(1)
+    }
+    console.log('init tracker', span_tracker)
+
+    // loop through the headers
+    for (var h = 0; h < header_levels.length; h++) {
+      var header = header_levels[h]
+      console.log('Processing header', h, header)
+      
+      // loop through the levels for the pivot headers
+      // if (field_at top) {}
+      var start = 0
+      var end = header.length - 1
+
+      for (var l = start; l < end; l++) {
+        console.log('...level', l)
+        var this_value = header_levels[h][l]
+        console.log('......h, header length', h, header_levels[h].length-1)
+        if (h < header_levels.length-1) {
+          console.log('......new above_value')
+          var above_value = header_levels[h+1][l]
+        }
+        console.log('......comparing', h, l, 'to', h+1, l, ':', this_value, above_value)
+
+        // increment the tracker if values match
+        if (h < header_levels.length-1 && this_value == above_value) {
+          console.log('......MATCH – INCREMENT, going to next level for this header')
+          span_values[h][l] = -1;
+          span_tracker[l] += 1;
+        } else {
+        // partial reset if the value differs
+          for (var l_ = l; l_ < end; l_++) {
+            console.log('......DIFFERS – PARTIAL RESET')
+            span_values[h][l_] = span_tracker[l_];
+            span_tracker[l_] = 1
+          }
+          console.log('.........span_values', h, span_values[h])
+          break;
+        }
+        console.log('.........span_values', h, span_values[h])
+      }
+
+    }
+
+    // loop backwards through the levels for the column labels
+    var label_level = 2
+    for (var l = 0; l < header_levels[0].length; l++) {
+      span_tracker.push(1) // reset to default
+    }
+
+    for (var h = header_levels.length-1; h >= 0; h--) {
+      var this_value = header_levels[h][label_level]
+      if (h > 0) {
+        var next_value =header_levels[h-1][label_level] 
+      }
+      // increment the span_tracker if dimensions match
+      if (h > 0 && this_value == next_value) {
+        span_values[h][label_level] = -1;
+        span_tracker[label_level] += 1;
+      } else {
+      // partial reset and continue if dimensions different
+        span_values[h][label_level] = span_tracker[label_level];
+        span_tracker[label_level] = 1
+      }
+    }
+
+    span_values.reverse()
+
+    for (var h = 0; h < headers.length; h++) {
+      headers[h].colspans = span_values[h]
+    }
+    console.log('colspans', span_values)
+    return headers
+  }
+
+  getHeaders (i, index_column=false, span_cols=true) {
     if (index_column) {
       var headers = this.columns.filter(c => c.field.measure || c.id == '$$$_index_$$$')
     } else {
       var headers =  this.columns.filter(c => c.id !== '$$$_index_$$$')
+    }
+
+    if (span_cols) {
+      headers = this.getColSpans(headers).filter(c => c.colspans[i] > 0)
     }
     console.log('getHeaders ->', headers)
     return headers
@@ -470,18 +573,24 @@ const buildReportTable = function(lookerData, use_index_column=false, span_rows=
     .append('tr')
     .selectAll('th')
     .data(function(level, i) { 
-      return lookerData.getHeaders(use_index_column).map(function(column) {
-        if (i < column.levels.length && column.pivoted) {
-          return column.levels[i]
-        } else if (i === column.levels.length) {
-          return column.field.label_short || column.field.label
-        } else {
-          return ''
+      return lookerData.getHeaders(i, use_index_column, true).map(function(column) {
+        var header = {
+          'text': '',
+          'colspan': column.colspans[i]
         }
+        if (i < column.levels.length && column.pivoted) {
+          header.text = column.levels[i]
+        } else if (i === column.levels.length) {
+          header.text = column.field.label_short || column.field.label
+        } else {
+          header.text = ''
+        }
+        return header
       })
     }).enter()
     .append('th')
-    .text(d => d);
+    .text(d => d.text)
+    .attr('colspan', d => d.colspan);
   
   var align = 'right'
   // create table body
@@ -490,7 +599,7 @@ const buildReportTable = function(lookerData, use_index_column=false, span_rows=
     .data(lookerData.data).enter()
     .append('tr')
     .selectAll('td')
-    .data(function(row) { // CHANGE TO USER A GET ROWS FUNCTION, WHICH INCLUDES ROW SPANS 
+    .data(function(row) {  
       return lookerData.getRow(row, use_index_column, span_rows).map(function(column) {
         var cell = row.data[column.id]
         cell.rowspan = column.rowspan
@@ -499,7 +608,7 @@ const buildReportTable = function(lookerData, use_index_column=false, span_rows=
       })
     }).enter()
     .append('td')
-      .text(d => d.rendered || d.value) // ADD ROW SPAN VALUE BELOW
+      .text(d => d.rendered || d.value) 
       .attr("rowspan", d => d.rowspan)
       .attr('class', d => {
         classes = []
