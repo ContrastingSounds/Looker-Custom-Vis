@@ -204,11 +204,9 @@ class LookerData {
     // loop backwards through data rows
     for (var r = this.data.length-1; r >= 0 ; r--) {
       var row = this.data[r]
-      console.log('row type', row.type)
 
       // full reset and continue for totals
       if (row.type !== 'line_item' ) {
-        console.log('TOTAL – resetting span_tracker')
         for (d = 0; d < this.dimensions.length; d++) {
           span_tracker[this.dimensions[d]] = 1
         }
@@ -216,37 +214,26 @@ class LookerData {
       }
 
       // loop fowards through the dimensions
-      console.log('Processing row', row.id)
       this.rowspan_values[row.id] = {}
       for (var d = 0; d < this.dimensions.length; d++) {
         var dim = this.dimensions[d]
-        console.log('...dimension:', dim)
 
-        // get value for this cell and one above (if available) 
         var this_cell_value = this.data[r].data[dim].value
-        console.log('......current cell', this_cell_value)
         if (r > 0) {
           var cell_above_value = this.data[r-1].data[dim].value
-          console.log('......  above cell', cell_above_value)
         }
 
         // increment the span_tracker if dimensions match
         if (r > 0 && this_cell_value == cell_above_value) {
-          console.log('......INCREMENT')
           this.rowspan_values[row.id][this.dimensions[d]] = -1;
           span_tracker[dim] += 1;
-          console.log('updated rowspan_values', this.rowspan_values[row.id])
-          console.log('updated span_tracker  ', span_tracker)
         } else {
         // partial reset and continue if dimensions different
-          console.log('......PARTIAL RESET')
           for (var d_ = d; d_ < this.dimensions.length; d_++) {
             var dim_ = this.dimensions[d_]
             this.rowspan_values[row.id][dim_] = span_tracker[dim_];
             span_tracker[dim_] = 1
           }
-          console.log('updated rowspan_values', this.rowspan_values[row.id])
-          console.log('updated span_tracker  ', span_tracker)
           break;
         }
       }
@@ -486,8 +473,10 @@ const buildReportTable = function(lookerData, use_index_column=false, span_rows=
       return lookerData.getHeaders(use_index_column).map(function(column) {
         if (i < column.levels.length && column.pivoted) {
           return column.levels[i]
-        } else {
+        } else if (i === column.levels.length) {
           return column.field.label_short || column.field.label
+        } else {
+          return ''
         }
       })
     }).enter()
