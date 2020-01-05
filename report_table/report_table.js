@@ -356,13 +356,13 @@ class LookerData {
       var highest_pivot_col = [0, '']
       var previous_subtotal = null
 
-      // console.log('Processing pivot', pivot)
+      console.log('Processing pivot', pivot)
 
       for (var m = 0; m < this.measures.length; m++) {
         var measure = this.measures[m]
-        // console.log('...measure', measure)
+        console.log('...measure', measure)
         var this_pivot_key = getPivotKey([pivot, measure], labels_at_bottom)
-        // console.log('...pivot key', this_pivot_key)
+        console.log('...pivot key', this_pivot_key)
         var subtotal_col = {
           field: measure,
           pivot: pivot,
@@ -370,23 +370,25 @@ class LookerData {
           id: ['$$$_subtotal_$$$', pivot, measure].join('.'),
           after: ''
         }
-        // console.log('...subtotal_col init', subtotal_col)
+        console.log('...subtotal_col init', subtotal_col)
 
         for (var c = 0; c < this.columns.length; c++) {
           var column = this.columns[c]
 
-          // console.log('......column', column.id)
+          console.log('...column', column.id)
 
-          if (column.pivoted && column.levels[0] == pivot && column.measure_name == measure) {
-            // console.log('pivoted, pivot, measure', column.pivoted, column.levels[0], column.measure_name)
-            // console.log('......VALID COLUMN')
-            subtotal_col.columns.push(column.id)
+          if (column.pivoted && column.levels[0] == pivot) {
+            if (column.measure_name == measure) {
+              console.log('......pivoted, pivot, measure', column.pivoted, column.levels[0], column.measure_name)
+              console.log('......VALID COLUMN')
+              subtotal_col.columns.push(column.id)
+            }
             if (getPivotKey([column.levels[0], column.measure_name], labels_at_bottom) == this_pivot_key) {
-              // console.log('......this_pivot_key', this_pivot_key)
-              // console.log('......VALID PIVOT KEY')
+              console.log('......this_pivot_key', this_pivot_key)
+              console.log('......VALID PIVOT KEY')
               if (c > highest_pivot_col[0]) {
-                // console.log('......current highest_pivot_col', highest_pivot_col)
-                // console.log('......UPDATE highest_pivot_col')
+                console.log('......current highest_pivot_col', highest_pivot_col)
+                console.log('......UPDATE highest_pivot_col')
                 highest_pivot_col = [c, column.id]
               }
             }
@@ -394,13 +396,15 @@ class LookerData {
         }
 
         if (this_pivot_key != last_pivot_key) {
-          // console.log('......last_pivot_key', last_pivot_key)
-          // console.log('......UPDATE last_pivot_col')
+          console.log('......this_pivot_key, last_pivot_key', this_pivot_key, last_pivot_key)
+          console.log('......UPDATE last_pivot_col')
           last_pivot_col[this_pivot_key] = highest_pivot_col[1]
           previous_subtotal = null
         }
 
         subtotal_col.after = previous_subtotal || last_pivot_col[this_pivot_key]
+        console.log('......AFTER', subtotal_col.after)
+        last_pivot_key = this_pivot_key
         previous_subtotal = subtotal_col.id
         subtotals.push(subtotal_col)
       }
