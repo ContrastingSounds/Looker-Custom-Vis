@@ -65,6 +65,54 @@ Rendering table - getRows() to replace getHeaders()
     - .filter
       - this.row_span_values[row_index][column.id] > 0
 
+## Adding Column SubTotals – addColumnSubTotals()
+
+- For a single level of pivot, existing row totals functionality will do
+- Only required therefore for pivots of depth 2+
+
+Qs
+- Take same approach as financial subtotals - choose a single level for subtotals?
+  - DESIGN: default to one level of subtotals, at highest level of pivot
+- Option to create list rather than sum? Both?
+  - DESIGN: figure out how to create sum. Only then expand to lists.
+- Labelling?
+  - DESIGN: Add a 'TOTAL' column that will fit under the higher level pivot
+- Set / disable config option when less than depth 2?
+
+Design
+- config setting: columnSubtotals (boolean)
+
+- IF (columnSubtotals == true && pivots.length > 1)
+
+- subtotal_level = 0
+- current_group = {
+    label: '',
+    before: '',
+    columns: []
+  }
+- subtotal_groups = []
+
+- loop through this.columns
+- IF (column.subtotaled) remove column
+- IF (column.pivoted)
+  - IF (current_group.label == column.levels[subtotal_level])
+    - current_group.columns.push(column.id)
+  - ELSE
+    - IF (current_group.columns.length > 0)
+      - current_group.before = column.levels[subtotal_level]
+      - subtotal_groups.push(current_group)
+    - current_group = { 
+        label: column.levels[subtotal_level], 
+        columns: [column.id]
+      }
+
+- insert new columns
+- for each subtotal group
+  - loop through this.columns  
+    - if (subtotal)
+
+- loop through rows
+
 
 ## Building a row (CHANGED: now can do single run through the columns)
 

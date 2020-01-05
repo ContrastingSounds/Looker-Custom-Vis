@@ -78,7 +78,14 @@ class LookerData {
     if (this.has_pivots) {
       for (var p = 0; p < this.pivots.length; p++) {
         for (var m = 0; m < this.measures.length; m++) {
-          if (typeof queryResponse.fields.measure_like[m].is_table_calculation === 'undefined') {
+          var include_measure = (
+            this.pivots[p]['key'] == '$$$_row_total_$$$' 
+            && typeof queryResponse.fields.measure_like[m].is_table_calculation === 'undefined'
+          ) || (
+            this.pivots[p]['key'] != '$$$_row_total_$$$' 
+          )
+          if (include_measure) {
+            // TODO: include table calcs in pivots!!
             var pivotKey = this.pivots[p]['key']
             var measureName = this.measures[m]
             var columnId = pivotKey + '.' + measureName
@@ -311,6 +318,10 @@ class LookerData {
     this.has_subtotals = true
   }
 
+  addColumnSubTotals () {
+    //
+  }
+
   getRenderedFromHtml (cellValue) {
     var parser = new DOMParser()
     // console.log('cell to renderFromHtml', cellValue)
@@ -330,102 +341,88 @@ class LookerData {
     return levels
   }
 
-  // getColSpans (headers, field_at_top=true) {
-  getColSpans (headers) {
+  // getColSpans (headers, field_at_top=true) { // TODO: option to have labels at top
+  getColSpans (headers, span_cols=true) {
     // build single array of the header values
-    // use column id for the first level
+    // use column id for the label level
     var header_levels = []
     var span_values = []
     var span_tracker = []
 
+    // init header_levels and span_values arrays
     for (var h = headers.length-1; h >= 0; h--) {
-      // if (field_at_top) {
-      //   header_levels.push(headers[h].levels.concat([headers[h].field.name])) 
-      // } else {
-      //   header_levels.push([headers[h].field.name].concat(headers[h].levels))  
-      // }
-      header_levels[headers.length-1 - h] = headers[h].levels.concat([headers[h].field.name])
+      header_levels[headers.length-1 - h] = headers[h].levels.concat([headers[h].field.name])  // option to swap concat order
       span_values[h] = []
       for (var l = 0; l < header_levels[headers.length-1 - h].length; l++) {
         span_values[h].push(1) // set defaults
       }
     }
-    console.log('header levels (reverse)', header_levels)
 
-    // init tracker
-    for (var l = 0; l < header_levels[0].length; l++) {
-      span_tracker.push(1)
-    }
-    console.log('init tracker', span_tracker)
+    if (span_cols) {
+      // init tracker
+      for (var l = 0; l < header_levels[0].length; l++) {
+        span_tracker.push(1)
+      }
 
-    // loop through the headers
-    for (var h = 0; h < header_levels.length; h++) {
-      var header = header_levels[h]
-      console.log('Processing header', h, header)
-      
-      // loop through the levels for the pivot headers
-      // if (field_at top) {}
-      var start = 0
-      var end = header.length - 1
+      // FIRST PASS: loop through the pivot headers
+      for (var h = 0; h < header_levels.length; h++) {
+        var header = header_levels[h]
+        
+        // loop through the levels for the pivot headers
+        // if (field_at top) {} // TODO: set levels according label level location
+        var start = 0
+        var end = header.length - 1
 
-      for (var l = start; l < end; l++) {
-        console.log('...level', l)
-        var this_value = header_levels[h][l]
-        console.log('......h, header length', h, header_levels[h].length-1)
-        if (h < header_levels.length-1) {
-          console.log('......new above_value')
-          var above_value = header_levels[h+1][l]
-        }
-        console.log('......comparing', h, l, 'to', h+1, l, ':', this_value, above_value)
-
-        // increment the tracker if values match
-        if (h < header_levels.length-1 && this_value == above_value) {
-          console.log('......MATCH – INCREMENT, going to next level for this header')
-          span_values[h][l] = -1;
-          span_tracker[l] += 1;
-        } else {
-        // partial reset if the value differs
-          for (var l_ = l; l_ < end; l_++) {
-            console.log('......DIFFERS – PARTIAL RESET')
-            span_values[h][l_] = span_tracker[l_];
-            span_tracker[l_] = 1
+        for (var l = start; l < end; l++) {
+          var this_value = header_levels[h][l]
+          if (h < header_levels.length-1) {
+            var above_value = header_levels[h+1][l]
           }
-          console.log('.........span_values', h, span_values[h])
-          break;
+
+          // increment the tracker if values match
+          if (h < header_levels.length-1 && this_value == above_value) {
+            span_values[h][l] = -1;
+            span_tracker[l] += 1;
+          } else {
+          // partial reset if the value differs
+            for (var l_ = l; l_ < end; l_++) {
+              span_values[h][l_] = span_tracker[l_];
+              span_tracker[l_] = 1
+            }
+            break;
+          }
         }
-        console.log('.........span_values', h, span_values[h])
       }
 
-    }
-
-    // loop backwards through the levels for the column labels
-    var label_level = 2
-    for (var l = 0; l < header_levels[0].length; l++) {
-      span_tracker.push(1) // reset to default
-    }
-
-    for (var h = header_levels.length-1; h >= 0; h--) {
-      var this_value = header_levels[h][label_level]
-      if (h > 0) {
-        var next_value =header_levels[h-1][label_level] 
+      // reset span_tracker
+      var label_level = 2
+      for (var l = 0; l < header_levels[0].length; l++) {
+        span_tracker.push(1) 
       }
-      // increment the span_tracker if dimensions match
-      if (h > 0 && this_value == next_value) {
-        span_values[h][label_level] = -1;
-        span_tracker[label_level] += 1;
-      } else {
-      // partial reset and continue if dimensions different
-        span_values[h][label_level] = span_tracker[label_level];
-        span_tracker[label_level] = 1
-      }
-    }
 
-    span_values.reverse()
+      // SECOND PASS: loop backwards through the levels for the column labels
+      for (var h = header_levels.length-1; h >= 0; h--) {
+        var this_value = header_levels[h][label_level]
+        if (h > 0) {
+          var next_value =header_levels[h-1][label_level] 
+        }
+        // increment the span_tracker if dimensions match
+        if (h > 0 && this_value == next_value) {
+          span_values[h][label_level] = -1;
+          span_tracker[label_level] += 1;
+        } else {
+        // partial reset and continue if dimensions different
+          span_values[h][label_level] = span_tracker[label_level];
+          span_tracker[label_level] = 1
+        }
+      }
+
+      span_values.reverse()
+    }
 
     for (var h = 0; h < headers.length; h++) {
       headers[h].colspans = span_values[h]
     }
-    console.log('colspans', span_values)
     return headers
   }
 
@@ -436,14 +433,12 @@ class LookerData {
       var headers =  this.columns.filter(c => c.id !== '$$$_index_$$$')
     }
 
-    if (span_cols) {
-      headers = this.getColSpans(headers).filter(c => c.colspans[i] > 0)
-    }
-    console.log('getHeaders ->', headers)
+    headers = this.getColSpans(headers, span_cols).filter(c => c.colspans[i] > 0)
+
+    // console.log('getHeaders ->', headers)
     return headers
   }
 
-  // ADD getRow(index_column=false, span_rows=true) function
   getRow (row, index_column=false, span_rows=true) {
     // filter out unwanted dimensions based on index_column setting
     if (index_column) {
@@ -467,7 +462,7 @@ class LookerData {
       }
     }
 
-    console.log('getRow ->', cells)
+    // console.log('getRow ->', cells)
     return cells
   }
 
@@ -501,23 +496,30 @@ const loadStylesheets = () => {
 
 const options = {
   subtotalDepth: {
-    section: "Subtotals",
+    section: "Table",
     type: "number",
     label: "Sub Total Depth",
     default: 1
   },
   indexColumn: {
-    section: "Subtotals",
+    section: "Table",
     type: "boolean",
     label: "Use Index Dimension",
     // display_size: 'third',
     default: "false",
   },
   spanRows: {
-    section: "Subtotals",
+    section: "Table",
     type: "boolean",
     label: "Span Rows",
-    // display_size: 'third',
+    display_size: 'half',
+    default: "true",
+  },
+  spanCols: {
+    section: "Table",
+    type: "boolean",
+    label: "Span Cols",
+    display_size: 'half',
     default: "true",
   }
 }
@@ -561,7 +563,7 @@ const getNewConfigOptions = function(config, fields) {
   return newOptions
 }
 
-const buildReportTable = function(lookerData, use_index_column=false, span_rows=true) {
+const buildReportTable = function(lookerData, use_index_column=false, span_rows=true, span_cols=true) {
 
   var table = d3.select('#visContainer')
     .append('table')
@@ -573,7 +575,7 @@ const buildReportTable = function(lookerData, use_index_column=false, span_rows=
     .append('tr')
     .selectAll('th')
     .data(function(level, i) { 
-      return lookerData.getHeaders(i, use_index_column, true).map(function(column) {
+      return lookerData.getHeaders(i, use_index_column, span_cols).map(function(column) {
         var header = {
           'text': '',
           'colspan': column.colspans[i]
@@ -659,8 +661,9 @@ looker.plugins.visualizations.add({
 
     lookerData = new LookerData(data, queryResponse)
     lookerData.addSubTotals(config.subtotalDepth)
+    console.log(queryResponse)
     console.log(lookerData)
-    buildReportTable(lookerData, config.indexColumn, config.spanRows);
+    buildReportTable(lookerData, config.indexColumn, config.spanRows, config.spanCols);
     
     done();
   }
