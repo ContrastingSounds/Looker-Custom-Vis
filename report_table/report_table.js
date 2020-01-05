@@ -31,17 +31,23 @@ class LookerData {
     this.dimensions = []
     this.measures = []
     this.data = []
+    this.pivot_fields = []
+    this.pivot_values = []
+
     this.rowspan_values = {}
 
-    this.pivots = []
-    this.number_of_pivots = queryResponse.fields.pivots.length
     this.has_totals = false
     this.has_subtotals = false
     this.has_pivots = false
     this.has_supers = false
 
+    for (var p = 0; p < queryResponse.fields.pivots.length; p++) { 
+      var name = queryResponse.fields.pivots[p].name
+      this.pivot_fields.push(name) 
+    }
+
     if (typeof queryResponse.pivots !== 'undefined') {
-      this.pivots = queryResponse.pivots
+      this.pivot_values = queryResponse.pivots
       this.has_pivots = true
     }
 
@@ -76,23 +82,22 @@ class LookerData {
     }
 
     if (this.has_pivots) {
-      for (var p = 0; p < this.pivots.length; p++) {
+      for (var p = 0; p < this.pivot_values.length; p++) {
         for (var m = 0; m < this.measures.length; m++) {
           var include_measure = (
-            this.pivots[p]['key'] == '$$$_row_total_$$$' 
-            && typeof queryResponse.fields.measure_like[m].is_table_calculation === 'undefined'
+            this.pivot_values[p]['key'] != '$$$_row_total_$$$' 
           ) || (
-            this.pivots[p]['key'] != '$$$_row_total_$$$' 
+            this.pivot_values[p]['key'] == '$$$_row_total_$$$' 
+            && typeof queryResponse.fields.measure_like[m].is_table_calculation === 'undefined'
           )
           if (include_measure) {
-            // TODO: include table calcs in pivots!!
-            var pivotKey = this.pivots[p]['key']
+            var pivotKey = this.pivot_values[p]['key']
             var measureName = this.measures[m]
             var columnId = pivotKey + '.' + measureName
             var levels = []
             for (var pf = 0; pf < queryResponse.fields.pivots.length; pf++) { 
               var pf_name = queryResponse.fields.pivots[pf].name
-              levels.push(this.pivots[p]['data'][pf_name]) 
+              levels.push(this.pivot_values[p]['data'][pf_name]) 
             }
             var column = new Column(columnId)
             column.levels = levels
@@ -319,7 +324,136 @@ class LookerData {
   }
 
   addColumnSubTotals () {
-    //
+    // https://pebl.dev.looker.com/explore/pebl/trans?qid=Vm6kceDf5Xv51y3VugI71G&origin_space=6&toggle=pik,vis
+    var labels_at_bottom = true
+
+    var getPivotKey = function(components, labels_at_bottom) {
+      // console.log('getPivotKey() called with', components, labels_at_bottom)
+      if (labels_at_bottom) {
+          var key = components[0]
+      } else {
+          var key = components.join('.')
+      }
+      return key
+    }
+
+    var this_pivot_key = ''
+    var last_pivot_key = ''
+    var last_pivot_col = {}
+    var subtotals = []
+
+    var pivots = []
+    var pivot_dimension = this.pivot_fields[0]
+    for (var p = 0; p < this.pivot_values.length; p++) {
+      var p_value = this.pivot_values[p]['data'][pivot_dimension]
+      if (p_value !== null) { pivots.push(p_value) }
+    }
+    pivots = [...new Set(pivots)]
+    // console.log('addColumnSubTotals pivots', pivots)
+
+    for (var p = 0; p < pivots.length; p++) {
+      var pivot = pivots[p]
+      var highest_pivot_col = [0, '']
+      var previous_subtotal = null
+
+      // console.log('Processing pivot', pivot)
+
+      for (var m = 0; m < this.measures.length; m++) {
+        var measure = this.measures[m]
+        // console.log('...measure', measure)
+        var this_pivot_key = getPivotKey([pivot, measure], labels_at_bottom)
+        // console.log('...pivot key', this_pivot_key)
+        var subtotal_col = {
+          field: measure,
+          pivot: pivot,
+          columns: [],
+          id: ['$$$_subtotal_$$$', pivot, measure].join('.'),
+          after: ''
+        }
+        // console.log('...subtotal_col init', subtotal_col)
+
+        for (var c = 0; c < this.columns.length; c++) {
+          var column = this.columns[c]
+
+          // console.log('......column', column.id)
+
+          if (column.pivoted && column.levels[0] == pivot && column.measure_name == measure) {
+            // console.log('pivoted, pivot, measure', column.pivoted, column.levels[0], column.measure_name)
+            // console.log('......VALID COLUMN')
+            subtotal_col.columns.push(column.id)
+            if (getPivotKey([column.levels[0], column.measure_name], labels_at_bottom) == this_pivot_key) {
+              // console.log('......this_pivot_key', this_pivot_key)
+              // console.log('......VALID PIVOT KEY')
+              if (c > highest_pivot_col[0]) {
+                // console.log('......current highest_pivot_col', highest_pivot_col)
+                // console.log('......UPDATE highest_pivot_col')
+                highest_pivot_col = [c, column.id]
+              }
+            }
+          }
+        }
+
+        if (this_pivot_key != last_pivot_key) {
+          // console.log('......last_pivot_key', last_pivot_key)
+          // console.log('......UPDATE last_pivot_col')
+          last_pivot_col[this_pivot_key] = highest_pivot_col[1]
+          previous_subtotal = null
+        }
+
+        subtotal_col.after = previous_subtotal || last_pivot_col[this_pivot_key]
+        previous_subtotal = subtotal_col.id
+        subtotals.push(subtotal_col)
+      }
+    }
+
+    console.log('column subtotals', subtotals)
+    // TODO: FIGURE OUT WHY THE LABELS_AT_BOTTOM_PATTERN ISN'T WORKING AS EXPECTED
+
+
+    // UPDATE THIS.COLUMNS WITH NEW SUBTOTAL COLUMNS
+    for (var s = 0; s < subtotals.length; s++) {
+      var subtotal = subtotals[s]
+      var column = new Column(subtotal.id)
+
+      column.levels = [subtotal.pivot, 'Subtotal', subtotal.field]
+      column.field = {} // Looker field definition
+      column.type = 'measure' // dimension | measure
+      column.pivoted = true
+      column.subtotal = true
+      column.pivot_key = [subtotal.pivot, '$$$_subtotal_$$$'].join('|')
+      column.measure_name = subtotal.field
+      column.align = 'center' // left | center | right
+
+      for (var col = 0; col < this.columns.length; col++) {
+        if (this.columns[col].id == subtotal.after) {
+          this.columns.splice(col + 1, 0, column);
+          break;
+        }
+      }
+    }
+
+    console.log('updated this.columns', this.columns)
+
+    // CALCULATE COLUMN SUB TOTALS
+    for  (var r = 0; r < this.data.length; r++) {
+      var row = this.data[r]
+      for (var s = 0; s < subtotals.length; s++) {
+        var subtotal = subtotals[s]
+        var subtotal_value = 0
+        for (var f = 0; f < subtotal.columns.length; f++) {
+          var field = subtotal.columns[f]
+          subtotal_value += row.data[field].value
+        }
+        row.data[subtotal.id] = {
+          value: subtotal_value,
+          rendered: formatter(subtotal_value),
+          align: 'right'
+        }
+        if (row.type == 'total') { row.data[subtotal.id].cell_style = 'total' }
+      }
+    }
+
+    return subtotals
   }
 
   getRenderedFromHtml (cellValue) {
@@ -337,7 +471,7 @@ class LookerData {
 
   getLevels () {
     var levels = [0]
-    for (var p=0; p<this.number_of_pivots; p++) { levels.push(p) } 
+    for (var p=0; p<this.pivot_fields.length; p++) { levels.push(p) } 
     return levels
   }
 
@@ -660,9 +794,15 @@ looker.plugins.visualizations.add({
     this.trigger("registerOptions", new_options);
 
     lookerData = new LookerData(data, queryResponse)
-    lookerData.addSubTotals(config.subtotalDepth)
     console.log(queryResponse)
+
+    lookerData.addSubTotals(config.subtotalDepth)
     console.log(lookerData)
+
+    if (1 == 1) {
+      lookerData.addColumnSubTotals()
+    }
+
     buildReportTable(lookerData, config.indexColumn, config.spanRows, config.spanCols);
     
     done();

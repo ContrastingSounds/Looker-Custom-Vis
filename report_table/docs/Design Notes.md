@@ -109,7 +109,7 @@ Design
 - insert new columns
 - for each subtotal group
   - loop through this.columns  
-    - if (subtotal)
+    - if (subtotal_group.before == column.id)
 
 - loop through rows
 
