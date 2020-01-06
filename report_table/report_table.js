@@ -14,14 +14,28 @@ class Row {
 class Column {
   constructor(id) {
     this.id = id
+    // this.label = '' // queryResponse.fields.measures[n].label_short
+    // this.view = '' // queryResponse.fields.measures[n].view_label
     this.levels = []
     this.field = {} // Looker field definition
     this.type = '' // dimension | measure
     this.pivoted = false
     this.super = false
-    this.pivot_key = ''
-    this.measure_name = ''
+    this.pivot_key = '' // queryResponse.pivots[n].key
+    this.measure_name = '' // queryResponse.fields.measures[n].name
     this.align = '' // left | center | right
+  }
+
+  getLabel (label_with_view=false, label_with_pivots=false) {
+    var label = this.label
+    if (label_with_view) { 
+      label = [this.view, label].join(' ') 
+    }
+    if (label_with_view) {
+      var pivots = this.levels.join(' ')
+      label = [label, pivots].join(' ') 
+    }
+    return label
   }
 }
 
@@ -41,6 +55,7 @@ class LookerData {
     this.has_pivots = false
     this.has_supers = false
 
+    // CHECK FOR PIVOTS AND SUPERMEASURES
     for (var p = 0; p < queryResponse.fields.pivots.length; p++) { 
       var name = queryResponse.fields.pivots[p].name
       this.pivot_fields.push(name) 
@@ -55,7 +70,7 @@ class LookerData {
       this.has_supers = true
     }
 
-    // BUILD COLUMN INDEX ///////////////////////////////////////////////////
+    // BUILD COLUMN INDEX 
     var index_column = new Column('$$$_index_$$$')
     index_column.align = 'left'
     var index_levels = ['$$$_index_$$$']
@@ -63,12 +78,14 @@ class LookerData {
     index_column.levels = index_levels
     this.columns.push(index_column)
 
+    // add dimensions, list of ids, list of full objects
     for (var d = 0; d < queryResponse.fields.dimension_like.length; d++) {
       var column_name = queryResponse.fields.dimension_like[d].name
-      this.dimensions.push(column_name)
-      var column = new Column(column_name)
+      
+      this.dimensions.push(column_name) // simple list of dimension ids
+      var column = new Column(column_name) // TODO: consider creating the column object once all required field values identified
       var levels = [column_name]
-      for (var p = 0; p < queryResponse.fields.pivots.length-1; p++) { levels.push('') }
+      for (var p = 0; p < queryResponse.fields.pivots.length-1; p++) { levels.push('') } // populate empty levels when pivoted
       column.levels = levels
       column.field = queryResponse.fields.dimension_like[d]
       column.type = 'dimension'
@@ -77,28 +94,33 @@ class LookerData {
       this.columns.push(column)
     }
 
+    // add measures, list of ids
     for (var m = 0; m < queryResponse.fields.measure_like.length; m++) {
-      this.measures.push(queryResponse.fields.measure_like[m].name)
+      this.measures.push(queryResponse.fields.measure_like[m].name) 
     }
 
+    // add measures, list of full objects
     if (this.has_pivots) {
       for (var p = 0; p < this.pivot_values.length; p++) {
         for (var m = 0; m < this.measures.length; m++) {
-          var include_measure = (
-            this.pivot_values[p]['key'] != '$$$_row_total_$$$' 
+          var include_measure = (                                     // for pivoted measures, skip table calcs for row totals
+            this.pivot_values[p]['key'] != '$$$_row_total_$$$'        // if user wants a row total for table calc, must define separately
           ) || (
             this.pivot_values[p]['key'] == '$$$_row_total_$$$' 
             && typeof queryResponse.fields.measure_like[m].is_table_calculation === 'undefined'
           )
+
           if (include_measure) {
             var pivotKey = this.pivot_values[p]['key']
             var measureName = this.measures[m]
             var columnId = pivotKey + '.' + measureName
-            var levels = []
+
+            var levels = [] // will contain a list of all the pivot values for this column
             for (var pf = 0; pf < queryResponse.fields.pivots.length; pf++) { 
               var pf_name = queryResponse.fields.pivots[pf].name
               levels.push(this.pivot_values[p]['data'][pf_name]) 
             }
+
             var column = new Column(columnId)
             column.levels = levels
             column.field = queryResponse.fields.measure_like[m]
@@ -112,6 +134,7 @@ class LookerData {
         }
       }
     } else {
+      // noticeably simpler for flat tables!
       for (var m = 0; m < this.measures.length; m++) {
         var column = new Column(this.measures[m])
         column.field = queryResponse.fields.measure_like[m]
@@ -122,7 +145,7 @@ class LookerData {
       }
     }
     
-    // this.supermeasures = []
+    // add supermeasures, if present
     if (typeof queryResponse.fields.supermeasure_like !== 'undefined') {
       for (var s = 0; s < queryResponse.fields.supermeasure_like.length; s++) {
         var column_name = queryResponse.fields.supermeasure_like[s].name
@@ -130,7 +153,7 @@ class LookerData {
 
         var column = new Column(column_name)
         var levels = [column_name]
-        for (var p = 0; p < queryResponse.fields.pivots.length-1; p++) { levels.push('') }
+        for (var p = 0; p < queryResponse.fields.pivots.length-1; p++) { levels.push('') }  // populate empty levels when pivoted
         column.levels = levels
         column.field = queryResponse.fields.supermeasure_like[s]
         column.type = 'measure'
@@ -141,10 +164,10 @@ class LookerData {
     }
 
     // BUILD ROWS
-    //
     for (var i = 0; i < lookerData.length; i++) {
-      var row = new Row('line_item')
+      var row = new Row('line_item') // TODO: consider creating the row object once all required field values identified
       
+      // flatten data, if pivoted. Looker's data structure is nested for pivots (to a single level, no matter how many pivots)
       for (var c = 0; c < this.columns.length; c++) {
         var column = this.columns[c]
         if (column.pivoted) {
@@ -154,14 +177,14 @@ class LookerData {
         }
       }
 
-      // Set Row Id
+      // set a unique id for the row
       var all_dims = []
       for (var d = 0; d < this.dimensions.length; d++) {
         all_dims.push(lookerData[i][this.dimensions[d]].value)
       }
       row.id = all_dims.join('|')
 
-      // Set Index Dimension value (note: this is the index for display purposes, while row.id is the unique reference)
+      // set an index value (note: this is an index purely for display purposes; row.id remains the unique reference value)
       var last_dim = this.dimensions[this.dimensions.length - 1]
       var last_dim_value = lookerData[i][last_dim].value
       row.data['$$$_index_$$$'] = { 'value': last_dim_value, 'cell_style': 'indent' }
@@ -172,8 +195,8 @@ class LookerData {
   
     // BUILD TOTALS
     if (typeof queryResponse.totals_data !== 'undefined') {
-      // var parser = new DOMParser()
       var totals_ = queryResponse.totals_data
+
       var totals_row = new Row('total')
 
       for (var c = 0; c < this.columns.length; c++) {
@@ -189,7 +212,7 @@ class LookerData {
             var cellKey = [column.pivot_key, column.measure_name].join('.')
             var cellValue = totals_[column.measure_name][column.pivot_key]
             cellValue.cell_style = 'total'
-            if (typeof cellValue.rendered == 'undefined' && typeof cellValue.html !== 'undefined' ){
+            if (typeof cellValue.rendered == 'undefined' && typeof cellValue.html !== 'undefined' ){ // totals data may include html but not rendered value
               cellValue.rendered = this.getRenderedFromHtml(cellValue)
             }
             totals_row.data[cellKey] = cellValue
@@ -565,28 +588,31 @@ class LookerData {
   }
 
   getHeaders (i, index_column=false, span_cols=true) {
+    // remove some dimension columns if we're just using a single index column
     if (index_column) {
-      var headers = this.columns.filter(c => c.field.measure || c.id == '$$$_index_$$$')
+      var headers = this.columns.filter(c => c.type == 'measure' || c.id == '$$$_index_$$$')
     } else {
       var headers =  this.columns.filter(c => c.id !== '$$$_index_$$$')
     }
 
+    // update list with colspans
     headers = this.getColSpans(headers, span_cols).filter(c => c.colspans[i] > 0)
 
-    // console.log('getHeaders ->', headers)
+    // console.log('getHeaders i ->', i, headers)
     return headers
   }
 
   getRow (row, index_column=false, span_rows=true) {
     // filter out unwanted dimensions based on index_column setting
     if (index_column) {
-      var cells = this.columns.filter(c => c.field.measure || c.id == '$$$_index_$$$')
+      var cells = this.columns.filter(c => c.type == 'measure' || c.id == '$$$_index_$$$')
     } else {
       var cells =  this.columns.filter(c => c.id !== '$$$_index_$$$')
     }
-
+    
+    // if we're using all dimensions, and we've got span_rows on, need to update the row
     if (!index_column && span_rows) {
-    // set row spans
+    // set row spans, for dimension cells that should appear
       for (var cell = 0; cell < cells.length; cell++) {
         cells[cell].rowspan = 1 // set default
         if (row.type === 'line_item' && this.rowspan_values[row.id][cells[cell].id] > 0) {
@@ -594,13 +620,12 @@ class LookerData {
         } 
       }
 
-      // filter out 'hidden' cells
+      // filter out dimension cells that a hidden / merged into a cell above
       if (row.type === 'line_item') {
         cells = cells.filter(c => c.type == 'measure' || this.rowspan_values[row.id][c.id] > 0)
       }
     }
 
-    // console.log('getRow ->', cells)
     return cells
   }
 
@@ -657,6 +682,20 @@ const options = {
     section: "Table",
     type: "boolean",
     label: "Span Cols",
+    display_size: 'half',
+    default: "true",
+  },
+  rowSubtotals: {
+    section: "Table",
+    type: "boolean",
+    label: "Row Subtotals",
+    display_size: 'half',
+    default: "true",
+  },
+  colSubtotals: {
+    section: "Table",
+    type: "boolean",
+    label: "Col Subtotals",
     display_size: 'half',
     default: "true",
   }
@@ -800,10 +839,12 @@ looker.plugins.visualizations.add({
     lookerData = new LookerData(data, queryResponse)
     console.log(queryResponse)
 
-    lookerData.addSubTotals(config.subtotalDepth)
+    if (config.rowSubtotals) {
+      lookerData.addSubTotals(config.subtotalDepth)
+    }
     console.log(lookerData)
 
-    if (1 == 1) {
+    if (config.colSubtotals) {
       lookerData.addColumnSubTotals()
     }
 
