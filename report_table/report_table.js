@@ -92,8 +92,6 @@ class LookerData {
     // BUILD INDEX COLUMN 
     var index_column = new Column('$$$_index_$$$')
     index_column.align = 'left'
-    // for (var p = 0; p < queryResponse.fields.pivots.length-1; p++) { index_levels.push('') }
-    // index_column.levels = index_levels
     index_column.levels = newArray(queryResponse.fields.pivots.length, '')
     index_column.sort_by_measure_values = [-1, 0, ...newArray(this.pivot_fields.length, 0)]
     index_column.sort_by_pivot_values = [-1, ...newArray(this.pivot_fields.length, 0), 0]
@@ -212,8 +210,6 @@ class LookerData {
         }) 
 
         var column = new Column(column_name)
-        // var levels = [column_name]
-        // for (var p = 0; p < queryResponse.fields.pivots.length-1; p++) { levels.push('') }  // populate empty levels when pivoted
         column.levels = newArray(queryResponse.fields.pivots.length, '')
         column.field = queryResponse.fields.supermeasure_like[s]
         column.label = column.field.label_short || column.field.label
@@ -373,7 +369,6 @@ class LookerData {
       return -1
     }
     this.columns.sort(compareColSortValues)
-    console.log(this)
   }
 
   addSubTotals () { 
@@ -531,10 +526,6 @@ class LookerData {
       }
     }
 
-    // console.log('column subtotals', subtotals)
-    // TODO: FIGURE OUT WHY THE LABELS_AT_BOTTOM_PATTERN ISN'T WORKING AS EXPECTED
-
-
     // UPDATE THIS.COLUMNS WITH NEW SUBTOTAL COLUMNS
     for (var s = 0; s < subtotals.length; s++) {
       var subtotal = subtotals[s]
@@ -545,7 +536,6 @@ class LookerData {
       column.view = subtotal.view || ''
       column.field = { name: subtotal.field } // Looker field definition. Name only, to calc colspans
       column.type = 'measure' // dimension | measure
-      // column.sort_by_measure_values = [1, 10000 + s, ...column.levels]
       column.sort_by_measure_values = [1, subtotal.measure_idx, ...column.levels]
 
       var pivot_values = [...column.levels]
@@ -561,12 +551,6 @@ class LookerData {
       column.field_name = subtotal.field
       column.align = 'center' // left | center | right
 
-      // for (var col = 0; col < this.columns.length; col++) {
-      //   if (this.columns[col].id == subtotal.after) {
-      //     this.columns.splice(col + 1, 0, column);
-      //     break;
-      //   }
-      // }
       this.columns.push(column)
     }
     this.sortColumns()
@@ -609,9 +593,6 @@ class LookerData {
   }
 
   getLevels () {
-    // var levels = [0]
-    // for (var p=0; p<this.pivot_fields.length; p++) { levels.push(p) } 
-    // return levels
     return newArray(this.pivot_fields.length+1, 0)
   }
 
@@ -626,24 +607,17 @@ class LookerData {
     // init header_levels and span_values arrays
     for (var c = columns.length-1; c >= 0; c--) {
       var idx = columns.length - 1 - c
+
       if (this.sortColsBy === 'sort_by_pivot_values') {
         header_levels[idx] = [...columns[c].levels, columns[c].field.name] // columns[c].levels.concat([columns[c].field.name])
       } else {
         header_levels[idx] = [columns[c].field.name, ...columns[c].levels]
       }
-      
-      // span_values[c] = []
-      // for (var l = 0; l < header_levels[idx].length; l++) {
-      //   span_values[c].push(1) // set defaults
-      // }
+
       span_values[c] = newArray(header_levels[idx].length, 1)
     }
 
     if (this.spanCols) {
-      // init tracker
-      // for (var l = 0; l < header_levels[0].length; l++) {
-      //   span_tracker.push(1)
-      // }
       span_tracker = newArray(header_levels[0].length, 1)
 
       // FIRST PASS: loop through the pivot headers
@@ -651,7 +625,6 @@ class LookerData {
         var header = header_levels[h]
         
         // loop through the levels for the pivot headers
-        // if (field_at top) {} // TODO: set levels according label level location
         var start = 0
         var end = header.length - 1
 
@@ -681,12 +654,6 @@ class LookerData {
       } else {
         var label_level = 0
       }
-      // reset span_tracker
-      // console.log('span_tracker before', span_tracker)
-      // for (var l = 0; l < header_levels[0].length; l++) {
-      //   span_tracker.push(1) 
-      // }
-      // console.log('span_tracker after', span_tracker)
 
       // SECOND PASS: loop backwards through the levels for the column labels
       for (var h = header_levels.length-1; h >= 0; h--) {
@@ -795,7 +762,6 @@ const options = {
     section: "Table",
     type: "boolean",
     label: "Use Index Dimension",
-    // display_size: 'third',
     default: "false",
   },
   sortColumnsBy: {
@@ -803,14 +769,9 @@ const options = {
     type: "string",
     display: "select",
     label: "Sort Columns By",
-    // display_size: 'third',
     values: [
-      {
-        'Pivots': 'sort_by_pivot_values'
-      },
-      {
-        'Measures': 'sort_by_measure_values'
-      }
+      { 'Pivots': 'sort_by_pivot_values' },
+      { 'Measures': 'sort_by_measure_values' }
     ],
     default: "sort_by_pivot_values",
   },
@@ -865,7 +826,7 @@ const getNewConfigOptions = function(config, fields) {
     newOptions['hide|' + fields[i].name] = {
       section: "Columns",
       type: "boolean",
-      label: 'Hide', // fields[i].name,
+      label: 'Hide',
       display_size: 'third',
       order: i * 10 + 2,
     }
@@ -873,7 +834,7 @@ const getNewConfigOptions = function(config, fields) {
     newOptions['var_num|' + fields[i].name] = {
       section: "Columns",
       type: "boolean",
-      label: 'Var #', // fields[i].name,
+      label: 'Var #',
       display_size: 'third',
       order: i * 10 + 3,
     }
@@ -881,7 +842,7 @@ const getNewConfigOptions = function(config, fields) {
     newOptions['var_pct|' + fields[i].name] = {
       section: "Columns",
       type: "boolean",
-      label: 'Var %', // fields[i].name,
+      label: 'Var %',
       display_size: 'third',
       order: i * 10 + 2,
     }
@@ -1003,21 +964,7 @@ looker.plugins.visualizations.add({
 
     lookerData = new LookerData(data, queryResponse, config)
     console.log(lookerData)
-    // if (config.rowSubtotals) {
-    //   lookerData.addSubTotals(config.subtotalDepth)
-    // }
-    // console.log(lookerData)
 
-    // if (config.colSubtotals) {
-    //   lookerData.addColumnSubTotals()
-    // }
-
-    // if (config.sortColumnsBy) {
-    //   lookerData.sortColsBy = config.sortColumnsBy
-    //   lookerData.sortColumns
-    // }
-
-    // buildReportTable(lookerData, config.indexColumn, config.spanRows, config.spanCols, config.sortColumnsBy);
     buildReportTable(lookerData)
     
     done();
