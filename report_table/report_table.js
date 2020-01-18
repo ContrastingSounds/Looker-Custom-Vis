@@ -76,7 +76,8 @@ class LookerData {
     this.has_pivots = false
     this.has_supers = false
 
-    console.log('LookerData constructor() this.spanRows', this.spanRows)
+    console.log('LookerData constructor() this.addRowSubtotals', this.addRowSubtotals)
+    console.log('LookerData constructor() this.addSubtotalDepth', this.addSubtotalDepth)
 
     // CHECK FOR PIVOTS AND SUPERMEASURES
     for (var p = 0; p < queryResponse.fields.pivots.length; p++) { 
@@ -381,7 +382,8 @@ class LookerData {
   }
 
   addSubTotals () { 
-    var depth = this.subtotalDepth
+    var depth = this.addSubtotalDepth
+    console.log('addSubTotals() depth addRowSubtotals', depth, this.addRowSubtotals)
 
     // BUILD GROUPINGS / SORT VALUES
     var subTotals = []
