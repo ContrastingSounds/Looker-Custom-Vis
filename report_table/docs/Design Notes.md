@@ -9,10 +9,10 @@
   + Have a single dimension column, appropriately indented for line items / subtotals / totals
   + Have a single dimension column, appropriately bolded/capitalised for line items / subtotals / totals
   + Colspans/multiple headers for pivots
-  - Option to put measure labels at top (with time periods grouped by measure)
-    - Method for sorting columns
-    – Column subtotals to require / not require specific grouping or ordering?
-    - Ensure subtotals are not generated for supermeasures
+  + Option to put measure labels at top (with time periods grouped by measure)
+    + Method for sorting columns
+    - Column subtotals to require / not require specific grouping or ordering?
+    + Ensure subtotals are not generated for supermeasures
   - Option to put total at top or bottom
   - Option to put subtotals above or below rows
   - Ability to hide rows associated with a given subtotal
