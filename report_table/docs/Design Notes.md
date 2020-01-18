@@ -1,16 +1,18 @@
 ### Tasks
 
-- Build a list of all columns in data
-- Create a 'semi-flat table' i.e. array of row objects, each of which has an array of cell objects
-- Display that as a table
++ Build a list of all columns in data
++ Create a 'semi-flat table' i.e. array of row objects, each of which has an array of cell objects
++ Display that as a table
 - Enrich the table object
-  - Add the total row
-  - Add the subtotal rows
-  - Have a single dimension column, appropriately indented for line items / subtotals / totals
-  - Have a single dimension column, appropriately bolded/capitalised for line items / subtotals / totals
-
-
-  - Colspans/multiple headers for pivots
+  + Add the total row
+  + Add the subtotal rows
+  + Have a single dimension column, appropriately indented for line items / subtotals / totals
+  + Have a single dimension column, appropriately bolded/capitalised for line items / subtotals / totals
+  + Colspans/multiple headers for pivots
+  - Option to put measure labels at top (with time periods grouped by measure)
+    - Method for sorting columns
+    – Column subtotals to require / not require specific grouping or ordering?
+    - Ensure subtotals are not generated for supermeasures
   - Option to put total at top or bottom
   - Option to put subtotals above or below rows
   - Ability to hide rows associated with a given subtotal
@@ -113,6 +115,66 @@ Design
 
 - loop through rows
 
+## Adding a variance
+
+- Make it easy to select a column and create a variance against another
+- Variance should be absolute and relative (%), with option of which to display
+- Ability to show negative variance in red text
+- Ability to add up/down/steady indicator
+- Flavours of variance
+  - Actual vs Plan
+  - Period vs Same Period
+  - Period to Previous Period
+
+Qs
+- repurpose existing config options per column?
+- always locate to right of selected column?
+- ability to do bulk comparisons? (ie JD Sport This Year vs Last year w/ 5 measures)
+- how to handle pivoted measures
+- how to handle subtotals 
+- any typical scenarios? where the same [pivoted | super] measure has multiple comparions?
+
+Pivoted measures
+- When you select a measure e.g. "Total Transction Value", related columns can include:
+  - simple measure
+  - multiple pivots
+  - multiple subtotals
+  - row total
+- Comparison options are
+  - unpivoted measure vs another unpivoted measure
+  - 1 PIVOT
+  - pivoted measure vs another pivoted measure of same pivot key
+  - pivoted measure vs another pivot of same measure
+  - row total of a measure vs row total of another measure
+  - 2 PIVOTS
+  - subtotaled measure vs another pivot of the same subtotal
+  - row total of a measure vs row total of another measure
+  - supermeasure vs another supermeasure
+- List could look like:
+  - 0 PIVOTS
+    - A. Actual v Budget
+  - 1 PIVOT
+    - A. Actual Row Total v Budget Row Total   | Actual vs Budget (row totals)
+    - Ba This Year Actual v Last Year Actual   | Compare Reporting Periods (example a)
+    - Bb Compare Jan, Feb, Mar                 | Compare Calendar Months   (example b)             | Feb vs Jan, Mar vs Feb Actual
+    - C. SuperX vs SuperY                      | Super X vs Super Y .. include row totals?
+  - 2 PIVOTS
+    - A. Actual Row Total v Budget Row Total
+    - B. Compare 1996, 1997, 1998              | Compare Calendar Years (compare sub totals)       | 1997 vs 1996, 1998 vs 1997 Actual
+    - C. Compare Jan, Feb, Mar                 | Compare Calendar Months (include w. sub totals)   | Feb vs Jan, Mar vs Feb Actual
+    - D. SuperX vs SuperY                      | Super X vs Super Y
+- Logic
+  - all available measures. (Include numerical dimensions? - by the time we're at reporting stage, just another number .. use cases?)
+    - all supermeasures, if pivoted
+  - all level 1 pivot values
+  - all level 2 pivot values
+  - 0 PIVOTS: if (??? == 0)
+    - List of all other measures. Inc all numerical columns?
+  - 1 PIVOT
+    - A. List of all other measure row totals. Compile list of "Measure Name vs Other Measure (row totals)", add to main list.
+    - B. List of pivot levels (using 1 onwards). Add entry: "Compare <PIVOT LEVEL NAME>s"
+    - C. List of all other supermeasures. Compile list of "Measure Name vs Other Measure", add to main list.
+  - 2 PIVOTS
 
 ## Building a row (CHANGED: now can do single run through the columns)
 
