@@ -54,7 +54,6 @@ class LookerData {
   constructor(lookerData, queryResponse, config) {
     this.columns = []
     this.dimensions = []
-    this.pivoted_measures = []
     this.measures = []
     this.data = []
     this.pivot_fields = []
@@ -293,15 +292,14 @@ class LookerData {
     // BUILD ROW SPANS
     this.updateRowSpanValues()
 
-    if (config.rowSubtotals) {
-      this.addSubTotals(config.subtotalDepth)
-    }
+
     if (config.colSubtotals) {
       this.addColumnSubTotals()
     }
+    if (config.rowSubtotals) {
+      this.addSubTotals(config.subtotalDepth)
+    }
     this.sortColumns()
-    
- 
   }
 
   updateRowSpanValues () {

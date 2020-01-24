@@ -13,6 +13,7 @@
     + Method for sorting columns
     - Column subtotals to require / not require specific grouping or ordering?
     + Ensure subtotals are not generated for supermeasures
+  - Remove labels_at_bottom if variable not being used
   - Option to put total at top or bottom
   - Option to put subtotals above or below rows
   - Ability to hide rows associated with a given subtotal
@@ -30,6 +31,8 @@
     - Initial requirement is a single dimension table i.e. simple calc with limit of N plus Totals enabled
   - Arbitrary re-grouping as supplementary information / rows below the total
     - If this means having a dimension used purely for re-grouping, might take a healthy chunk of data re-processing. It's not possible to "hide from vis" and still have access to the values. Which means they must be present and impacting any existing sub-totals
+- Running Sub Totals
+  - Especially for income statement style tables
 - Sparklines
   - https://www.essycode.com/posts/create-sparkline-charts-d3/
   - http://www.tnoda.com/blog/2013-12-19/
@@ -37,6 +40,8 @@
   - https://bl.ocks.org/mph006/20f76a764fd5ed2ff37f
   - https://github.com/DKirwan/reusable-d3-sparkline
   - http://prag.ma/code/sparky/
+- Transpose
+  - Some statements are better done as transposed tables e.g. inserting EPS in to middle of rows
 
 ## Cell merge in dimensions
 
