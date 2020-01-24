@@ -292,12 +292,11 @@ class LookerData {
     // BUILD ROW SPANS
     this.updateRowSpanValues()
 
-
-    if (config.colSubtotals) {
-      this.addColumnSubTotals()
-    }
     if (config.rowSubtotals) {
       this.addSubTotals(config.subtotalDepth)
+    }
+    if (config.colSubtotals) {
+      this.addColumnSubTotals()
     }
     this.sortColumns()
   }
