@@ -102,10 +102,13 @@ class LookerData {
 
     // add dimensions, list of ids, list of full objects
     for (var d = 0; d < queryResponse.fields.dimension_like.length; d++) {
-      var column_name = queryResponse.fields.dimension_like[d].name
-      this.dimensions.push(column_name) // simple list of dimension ids
+      this.dimensions.push({
+        name: queryResponse.fields.dimension_like[d].name,
+        label: queryResponse.fields.dimension_like[d].label_short || queryResponse.fields.dimension_like[d].label,
+        view: queryResponse.fields.dimension_like[d].view_label || '',
+      })
 
-      var column = new Column(column_name) // TODO: consider creating the column object once all required field values identified
+      var column = new Column(queryResponse.fields.dimension_like[d].name) // TODO: consider creating the column object once all required field values identified
       column.levels = newArray(queryResponse.fields.pivots.length, '') // populate empty levels when pivoted
       column.field = queryResponse.fields.dimension_like[d]
       column.field_name = column.field.name
@@ -240,12 +243,12 @@ class LookerData {
       // set a unique id for the row
       var all_dims = []
       for (var d = 0; d < this.dimensions.length; d++) {
-        all_dims.push(lookerData[i][this.dimensions[d]].value)
+        all_dims.push(lookerData[i][this.dimensions[d].name].value)
       }
       row.id = all_dims.join('|')
 
       // set an index value (note: this is an index purely for display purposes; row.id remains the unique reference value)
-      var last_dim = this.dimensions[this.dimensions.length - 1]
+      var last_dim = this.dimensions[this.dimensions.length - 1].name
       var last_dim_value = lookerData[i][last_dim].value
       row.data['$$$_index_$$$'] = { 'value': last_dim_value, 'cell_style': 'indent' }
 
@@ -263,7 +266,7 @@ class LookerData {
         var column = this.columns[c]
         totals_row.data[column.id] = { 'value': '' } // set a default on all columns
 
-        if (column.id == this.dimensions[this.dimensions.length-1]) {
+        if (column.id == this.dimensions[this.dimensions.length-1].name) {
           totals_row.data[column.id] = { 'value': 'TOTAL', 'cell_style': 'total' }
         } 
 
@@ -310,7 +313,7 @@ class LookerData {
       // full reset and continue for totals
       if (row.type !== 'line_item' ) {
         for (d = 0; d < this.dimensions.length; d++) {
-          span_tracker[this.dimensions[d]] = 1
+          span_tracker[this.dimensions[d].name] = 1
         }
         continue;
       }
@@ -318,8 +321,7 @@ class LookerData {
       // loop fowards through the dimensions
       this.rowspan_values[row.id] = {}
       for (var d = 0; d < this.dimensions.length; d++) {
-        var dim = this.dimensions[d]
-
+        var dim = this.dimensions[d].name
         var this_cell_value = this.data[r].data[dim].value
         if (r > 0) {
           var cell_above_value = this.data[r-1].data[dim].value
@@ -327,12 +329,12 @@ class LookerData {
 
         // increment the span_tracker if dimensions match
         if (r > 0 && this_cell_value == cell_above_value) {
-          this.rowspan_values[row.id][this.dimensions[d]] = -1;
+          this.rowspan_values[row.id][this.dimensions[d].name] = -1;
           span_tracker[dim] += 1;
         } else {
         // partial reset and continue if dimensions different
           for (var d_ = d; d_ < this.dimensions.length; d_++) {
-            var dim_ = this.dimensions[d_]
+            var dim_ = this.dimensions[d_].name
             this.rowspan_values[row.id][dim_] = span_tracker[dim_];
             span_tracker[dim_] = 1
           }
@@ -379,7 +381,7 @@ class LookerData {
       if (row.type !== 'total') {
         var grouping = []
         for (var g = 0; g < depth; g++) {
-          var dim = this.dimensions[g]
+          var dim = this.dimensions[g].name
           grouping.push(row.data[dim].value)
         }
         if (grouping.join('|') !== latest_grouping.join('|')) {
@@ -803,51 +805,114 @@ const options = {
     label: "Col Subtotals",
     display_size: 'half',
     default: "true",
-  }
+  },
+  // my_object_list: {
+  //   type: 'object_list',
+  //   label: 'My cool object list',
+  //   newItem: {
+  //     my_color: '#F0000D',
+  //     label_position: 'right',
+  //     my_number: 7,
+  //     my_dropdown: 'three',
+  //     show_label: true
+  //   },
+  //   options: {
+  //     my_dropdown: {
+  //       label: 'Dropdown stuff',
+  //       type: 'string',
+  //       display: 'select',
+  //       values: [
+  //         { One: 'one' },
+  //         { Two: 'two' },
+  //         { Three: 'three' },
+  //         { Four: 'four' }
+  //       ],
+  //       order: 3
+  //     },
+  //     my_number: {
+  //       label: 'A number',
+  //       type: 'number',
+  //       default: 7,
+  //       placeholder: 'Positive integer (1,2,3...)',
+  //       step: 1,
+  //       min: 1,
+  //       order: 4,
+  //     },
+  //     my_color: {
+  //       type: 'string',
+  //       display: 'color',
+  //       label: 'Color'
+  //     },
+  //     my_boolean: {
+  //       type: 'boolean',
+  //       label: 'Hide or show a thing',
+  //       order: 9
+  //     },
+  //   }
+  // }
 }
 
-const getNewConfigOptions = function(config, fields) {
+const getNewConfigOptions = function(table) {
   newOptions = options;
 
-  for (var i = 0; i < fields.length; i++) {
-    newOptions['label|' + fields[i].name] = {
-      section: "Columns",
+  for (var i = 0; i < table.dimensions.length; i++) {
+    console.log('getNewConfigOptions', table.dimensions[i].name)
+    newOptions['label|' + table.dimensions[i].name] = {
+      section: "Dimensions",
       type: "string",
-      label: fields[i].label_short || fields[i].label,
-      order: i * 10,
+      label: table.dimensions[i].label,
+      default: table.dimensions[i].label,
+      order: i * 10 + 1,
     }
 
-    newOptions['comparison|' + fields[i].name] = {
-      section: "Columns",
-      type: "string",
-      label: 'Comparison for ' + ( fields[i].label_short || fields[i].label ),
-      order: i * 10 + 1
-    }
-
-    newOptions['hide|' + fields[i].name] = {
-      section: "Columns",
+    newOptions['hide|' + table.dimensions[i].name] = {
+      section: "Dimensions",
       type: "boolean",
       label: 'Hide',
       display_size: 'third',
       order: i * 10 + 2,
     }
+  }
 
-    newOptions['var_num|' + fields[i].name] = {
-      section: "Columns",
+  for (var i = 0; i < table.measures.length; i++) {
+    newOptions['label|' + table.measures[i].name] = {
+      section: "Measures",
+      type: "string",
+      label: table.measures[i].label_short || table.measures[i].label,
+      default: table.measures[i].label_short || table.measures[i].label,
+      order: 100 + i * 10 + 1,
+    }
+
+    newOptions['hide|' + table.measures[i].name] = {
+      section: "Measures",
+      type: "boolean",
+      label: 'Hide',
+      display_size: 'third',
+      order: 100 + i * 10 + 3,
+    }
+
+    newOptions['comparison|' + table.measures[i].name] = {
+      section: "Measures",
+      type: "string",
+      label: 'Comparison for ' + ( table.measures[i].label_short || table.measures[i].label ),
+      order: 100 + i * 10 + 2
+    }
+
+    newOptions['var_num|' + table.measures[i].name] = {
+      section: "Measures",
       type: "boolean",
       label: 'Var #',
       display_size: 'third',
-      order: i * 10 + 3,
+      order: 100 + i * 10 + 4,
     }
 
-    newOptions['var_pct|' + fields[i].name] = {
-      section: "Columns",
+    newOptions['var_pct|' + table.measures[i].name] = {
+      section: "Measures",
       type: "boolean",
       label: 'Var %',
       display_size: 'third',
-      order: i * 10 + 2,
+      order: 100 + i * 10 + 3,
     }
-
   }
   console.log('newOptions', newOptions)
   return newOptions
@@ -960,13 +1025,13 @@ looker.plugins.visualizations.add({
       fields = fields.concat(queryResponse.fields.supermeasure_like)
     }
 
-    new_options = getNewConfigOptions(config, fields)
-    this.trigger("registerOptions", new_options)
-
     lookerData = new LookerData(data, queryResponse, config)
     console.log(lookerData)
 
     buildReportTable(lookerData)
+
+    new_options = getNewConfigOptions(lookerData)
+    this.trigger("registerOptions", new_options)
     
     // TODO: Hide vis until build complete
     done();
