@@ -416,7 +416,11 @@ class LookerData {
               subtotal_value += data_row.data[cellKey].value
             } 
           }
-          var cellValue = {'value': formatter(subtotal_value), 'cell_style': 'total'}
+          var cellValue = {
+            value: subtotal_value,
+            rendered: formatter(subtotal_value), 
+            cell_style: 'total'
+          }
           subtotal.data[cellKey] = cellValue
         }
       }
@@ -964,6 +968,7 @@ looker.plugins.visualizations.add({
 
     buildReportTable(lookerData)
     
+    // TODO: Hide vis until build complete
     done();
   }
 })
