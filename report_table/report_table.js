@@ -745,7 +745,7 @@ const addCSS = link => {
 };
 
 const loadStylesheets = () => {
-  addCSS('https://jwtest.ngrok.io/report_table/report_table.css');
+  addCSS('https://raw.githack.com/ContrastingSounds/Looker-Custom-Vis/report_table_dev/report_table/report_table.css');
 };
 
 const options = {
