@@ -22,6 +22,7 @@ class Row {
 class Column {
   constructor(id) {
     this.id = id
+    this.idx = 0
     this.label = '' // queryResponse.fields.measures[n].label_short
     this.view = '' // queryResponse.fields.measures[n].view_label
     this.levels = []
@@ -30,7 +31,7 @@ class Column {
     this.type = '' // dimension | measure
     this.pivoted = false
     this.super = false
-    this.pivot_key = '' // queryResponse.pivots[n].key
+    this.pivot_key = '' // queryResponse.pivots[n].key // single string that concats all pivot values
     this.align = '' // left | center | right
 
     this.sort_by_measure_values = [] // [index -1|dimension 0|measure 1|row totals & supermeasures 2, column number, [measure values]  ]
@@ -74,6 +75,8 @@ class LookerData {
     this.has_pivots = false
     this.has_supers = false
 
+    this.variances = []
+
     // CHECK FOR PIVOTS AND SUPERMEASURES
     for (var p = 0; p < queryResponse.fields.pivots.length; p++) { 
       var name = queryResponse.fields.pivots[p].name
@@ -88,6 +91,23 @@ class LookerData {
     if (typeof queryResponse.fields.supermeasure_like !== 'undefined') {
       this.has_supers = true
     }
+
+    // CHECK FOR VARIANCE CALCULATIONS
+    Object.keys(config).forEach(option => {
+      if (option.startsWith('comparison')) {
+        if (this.pivot_fields.includes(config[option])) {
+          var type = 'by_pivot'
+        } else {
+          var type = 'vs_measure'
+        }
+        this.variances.push({
+          baseline: option.split('|')[1],
+          comparison: config[option],
+          type: type
+        })
+      }
+    })
+    console.log('Variances', this.variances)
 
     // BUILD INDEX COLUMN 
     var index_column = new Column('$$$_index_$$$')
@@ -110,6 +130,7 @@ class LookerData {
       })
 
       var column = new Column(queryResponse.fields.dimension_like[d].name) // TODO: consider creating the column object once all required field values identified
+      column.idx = col_idx
       column.levels = newArray(queryResponse.fields.pivots.length, '') // populate empty levels when pivoted
       column.field = queryResponse.fields.dimension_like[d]
       column.field_name = column.field.name
@@ -122,7 +143,7 @@ class LookerData {
       column.sort_by_pivot_values = [0, ...newArray(this.pivot_fields.length, 0), col_idx]
 
       this.columns.push(column)
-      col_idx += 1
+      col_idx += 10
     }
 
     // add measures, list of ids
@@ -161,6 +182,7 @@ class LookerData {
             }
 
             var column = new Column(columnId)
+            column.idx = col_idx
             column.levels = levels
             column.field = queryResponse.fields.measure_like[m]
             column.label = column.field.label_short || column.field.label
@@ -180,7 +202,7 @@ class LookerData {
             }
 
             this.columns.push(column)
-            col_idx += 1
+            col_idx += 10
           }
         }
       }
@@ -188,6 +210,7 @@ class LookerData {
       // noticeably simpler for flat tables!
       for (var m = 0; m < this.measures.length; m++) {
         var column = new Column(this.measures[m].name)
+        column.idx = col_idx
         column.field = queryResponse.fields.measure_like[m]
         column.label = column.field.label_short || column.field.label
         column.view = column.field.view_label
@@ -197,7 +220,7 @@ class LookerData {
         column.sort_by_measure_values = [1, col_idx]
         column.sort_by_pivot_values = [1, col_idx]
         this.columns.push(column)
-        col_idx += 1
+        col_idx += 10
       }
     }
     
@@ -213,6 +236,7 @@ class LookerData {
         }) 
 
         var column = new Column(column_name)
+        column.idx = col_idx
         column.levels = newArray(queryResponse.fields.pivots.length, '')
         column.field = queryResponse.fields.supermeasure_like[s]
         column.label = column.field.label_short || column.field.label
@@ -223,7 +247,7 @@ class LookerData {
         column.sort_by_measure_values = [2, col_idx, ...newArray(this.pivot_fields.length, 1)]
         column.sort_by_pivot_values = [2, ...newArray(this.pivot_fields.length, 1), col_idx]
         this.columns.push(column)
-        col_idx += 1
+        col_idx += 10
       }
     }
 
@@ -305,7 +329,18 @@ class LookerData {
     if (ColSubtotalsAreValid) {
       this.addColumnSubTotals()
     }
+    this.addVarianceColumns()
     this.sortColumns()
+  }
+
+  getColumnById (id) {
+    var column = {}
+    this.columns.forEach(c => {
+      if (id === c.id) { 
+        column = c 
+      }
+    })
+    return column
   }
 
   updateRowSpanValues () {
@@ -570,6 +605,73 @@ class LookerData {
     }
 
     return subtotals
+  }
+
+  calculateVariance (id, calc, baseline, comparison) {
+    for  (var r = 0; r < this.data.length; r++) {
+      var row = this.data[r]
+      var baseline_value = row.data[baseline.id].value
+      var comparison_value = row.data[comparison.id].value
+      if (calc === 'absolute') {
+        var cell_value = {
+          align: 'right',
+          value: baseline_value - comparison_value
+        }
+      } else {
+        var cell_value = {
+          align: 'right',
+          value: (baseline_value - comparison_value) / comparison_value
+        }
+      }
+      row.data[id] = cell_value
+    }
+  }
+
+  addVarianceColumns () {
+    console.log('addVarianceColumns() called')
+    console.log('available measures:', this.measures)
+
+    var calcs = ['absolute', 'percent']
+    calcs.forEach(calc => {
+      Object.keys(this.variances).forEach(v => {
+        var variance = this.variances[v]
+        if (variance.type === 'vs_measure') {
+          if (!this.has_pivots) {
+            var id = ['$$$_variance_$$$', calc, variance.baseline, variance.comparison].join('|')
+            var column = new Column(id)
+            var baseline = this.getColumnById(variance.baseline)
+            var comparison = this.getColumnById(variance.comparison)
+
+            if (calc === 'absolute') {
+              column.idx = baseline.idx + 1
+              column.label = 'Var #'
+            } else {
+              column.idx = baseline.idx + 2
+              column.label = 'Var %'
+            }
+            column.field = {
+              name: id
+            }
+            column.type = 'measure'
+            column.pivoted = baseline.pivoted
+            column.super_ = baseline.super
+            column.levels = []
+            column.pivot_key = ''
+            column.align = 'right'
+            column.sort_by_measure_values = [1, column.idx]
+            column.sort_by_pivot_values = [1, column.idx]
+
+            console.log('addVarianceColumn', column)
+            this.columns.push(column)
+            this.calculateVariance(id, calc, baseline, comparison)
+          } else {
+            // pivoted measures
+          }
+        } else {
+          // by_pivot
+        }
+      })
+    })
   }
 
   getRenderedFromHtml (cellValue) {

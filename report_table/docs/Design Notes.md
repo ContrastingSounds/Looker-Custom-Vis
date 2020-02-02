@@ -169,60 +169,70 @@ Pivoted measures
     - C. Compare Jan, Feb, Mar                 | Compare Calendar Months (include w. sub totals)   | Feb vs Jan, Mar vs Feb Actual
     - D. SuperX vs SuperY                      | Super X vs Super Y
 - Logic
-  - all available measures. (Include numerical dimensions? - by the time we're at reporting stage, just another number .. use cases?)
-    - all supermeasures, if pivoted
-  - all level 1 pivot values
-  - all level 2 pivot values
-  - 0 PIVOTS: if (??? == 0)
-    - List of all other measures. Inc all numerical columns?
-  - 1 PIVOT
-    - A. List of all other measure row totals. Compile list of "Measure Name vs Other Measure (row totals)", add to main list.
-    - B. List of pivot levels (using 1 onwards). Add entry: "Compare <PIVOT LEVEL NAME>s"
-    - C. List of all other supermeasures. Compile list of "Measure Name vs Other Measure", add to main list.
-  - 2 PIVOTS
+  - 0 Pivots
+    - Baseline: Selected Column
+    - Comparison: Selected Column
+  - 1 Pivot Sort By Pivot
+  - 1 Pivot Sort By Measure
+  - 2 Pivots Sort By Pivot
+  - 2 Pivots Sort By Measure
 
-## Building a row (CHANGED: now can do single run through the columns)
 
-1. Create row
-2. Dimensions
-3. Measures 
-   - if flat
-     - else pivots
-5. Supermeasures
+## Creating a new column
 
-#### Create row
-    var row = new Row(type) // type: line_item | subtotal | total
+1. Create list of new objects
+2. Update this.columns with Column object(s)
+3. Update Rows in this.data 
 
-#### Dimensions
-    for (var d = 0; d < this.dims.length; d++) {
-      var dim = this.dims[d].name
-      row.data[dim] = // calculate cell value
-    }
+```
+  constructor(id) {
+    this.id = id
+    this.label = '' // queryResponse.fields.measures[n].label_short
+    this.view = '' // queryResponse.fields.measures[n].view_label
+    this.levels = []
+    this.field = {} // Looker field definition
+    this.field_name = ''
+    this.type = '' // dimension | measure
+    this.pivoted = false
+    this.super = false
+    this.pivot_key = '' // queryResponse.pivots[n].key
+    this.align = '' // left | center | right
 
-#### Measures
-    if (this.has_pivots) { // Pivoted measures, skipping table_calculations for row totals
-      for(var p = 0; p < this.pivots.length; p++) {
-        for (var m = 0; m < meas.length; m++) {
-          if (!this.pivots[p].is_total || typeof meas[m].is_table_calculation  == 'undefined') {
-            var pivotKey = this.pivots[p]['key']
-            var measureName = meas[m]['name']
-            var cellKey = pivotKey + '.' + measureName
-            var cellValue = // calculate cell value
-            row.data[cellKey] = cellValue
-          }
-        }
-      } else { // Flat table measures
-        for (var m = 0; m < this.meas.length; m++) {
-          var mea = this.meas[m].name
-          row.data[mea] = // calculate cell value 
-        }
-      }
-    }
+    this.sort_by_measure_values = [] // [index -1|dimension 0|measure 1|row totals & supermeasures 2, column number, [measure values]  ]
+    this.sort_by_pivot_values = []   // [index -1|dimension 0|measure 1|row totals & supermeasures 2, [pivot values], column number    ]
+  }
+```
 
-#### Supermeasures
-    if (this.has_supers) {
-      for (var s = 0; s < this.supers.length; s++) {
-        var super_ = this.supers[s].name
-        row.data[super_] = // calculate cell value
-      }
-    }
+## variance column
+
+id = $$$_[absolute|percent]variance_$$$.[baseline.id].[comparison.id]
+label = Var # | Var %
+view = ''
+levels = ???
+field = {
+  name: id
+}
+field_name = id
+type = measure
+pivoted = baseline.pivoted
+super = baseline.super
+pivot_key = levels.join('|')
+align = 'right'
+this.sort_by_measure_values = ???
+this.sort_by_pivot_values = ???
+
+1. What baseline column(s)
+2. What comparison column(s)
+3. Build ids
+4. For each id:
+   - Create column
+     - set label, field, field_name, type, pivoted, super
+     - levels = ???
+   - For each row:
+     - if absolute, value = baseline - comparison
+     - else value = (baseline - comparison) / comparison
+     - cell = {
+          value:
+          rendered:
+        }  
+5. Sort Columns
