@@ -14,7 +14,7 @@ class Row {
   constructor(type) {
     this.id = ''
     this.type = type
-    this.sort = []
+    this.sort = [] // [total before|total after, subtotal group, row number]
     this.data = {}
   }
 }
@@ -33,8 +33,8 @@ class Column {
     this.pivot_key = '' // queryResponse.pivots[n].key
     this.align = '' // left | center | right
 
-    this.sort_by_measure_values = []
-    this.sort_by_pivot_values = []
+    this.sort_by_measure_values = [] // [index -1|dimension 0|measure 1|row totals & supermeasures 2, column number, [measure values]  ]
+    this.sort_by_pivot_values = []   // [index -1|dimension 0|measure 1|row totals & supermeasures 2, [pivot values], column number    ]
   }
 
   getLabel (label_with_view=false, label_with_pivots=false) {
@@ -299,7 +299,10 @@ class LookerData {
     if (config.rowSubtotals) {
       this.addSubTotals(config.subtotalDepth)
     }
-    if (config.colSubtotals) {
+
+    var ColSubtotalsAreValid = config.colSubtotals && this.pivot_fields.length == 2
+                                //  || (this.pivot_fields.length == 1 && this.sortColsBy === 'sort_by_measure_values' )
+    if (ColSubtotalsAreValid) {
       this.addColumnSubTotals()
     }
     this.sortColumns()
@@ -434,21 +437,13 @@ class LookerData {
     this.has_subtotals = true
   }
 
+  /**
+   * Generates new column subtotals, where 2 pivot levels have been used, or 1 pivot level sorted by measure values.
+   * 
+   * 
+   */
   addColumnSubTotals () {
     // https://pebl.dev.looker.com/explore/pebl/trans?qid=Vm6kceDf5Xv51y3VugI71G&origin_space=6&toggle=pik,vis
-    var labels_at_bottom = true
-
-    var getPivotKey = function(components, labels_at_bottom) {
-      // console.log('getPivotKey() called with', components, labels_at_bottom)
-      if (labels_at_bottom) {
-          var key = components[0]
-      } else {
-          var key = components.join('.')
-      }
-      return key
-    }
-
-    var this_pivot_key = ''
     var last_pivot_key = ''
     var last_pivot_col = {}
     var subtotals = []
@@ -462,8 +457,6 @@ class LookerData {
     pivots = [...new Set(pivots)]
     // console.log('addColumnSubTotals pivots', pivots)
 
-    var sub_idx = 0
-
     for (var p = 0; p < pivots.length; p++) {
       var pivot = pivots[p]
       var highest_pivot_col = [0, '']
@@ -475,8 +468,7 @@ class LookerData {
         if (this.measures[m].can_pivot) {
           var measure = this.measures[m].name
           // console.log('...measure', measure)
-          var this_pivot_key = getPivotKey([pivot, measure], labels_at_bottom)
-          // console.log('...pivot key', this_pivot_key)
+          // console.log('...pivot key', pivot)
           var subtotal_col = {
             field: measure,
             label: this.measures[m].label,
@@ -501,8 +493,8 @@ class LookerData {
                 // console.log('......VALID COLUMN')
                 subtotal_col.columns.push(column.id)
               }
-              if (getPivotKey([column.levels[0], column.field_name], labels_at_bottom) == this_pivot_key) {
-                // console.log('......this_pivot_key', this_pivot_key)
+              if (column.levels[0] == pivot) {
+                // console.log('......pivot', pivot)
                 // console.log('......VALID PIVOT KEY')
                 if (c > highest_pivot_col[0]) {
                   // console.log('......current highest_pivot_col', highest_pivot_col)
@@ -513,19 +505,18 @@ class LookerData {
             }
           }
   
-          if (this_pivot_key != last_pivot_key) {
-            // console.log('......this_pivot_key, last_pivot_key', this_pivot_key, last_pivot_key)
+          if (pivot != last_pivot_key) {
+            // console.log('......pivot, last_pivot_key', pivot, last_pivot_key)
             // console.log('......UPDATE last_pivot_col')
-            last_pivot_col[this_pivot_key] = highest_pivot_col[1]
+            last_pivot_col[pivot] = highest_pivot_col[1]
             previous_subtotal = null
           }
   
-          subtotal_col.after = previous_subtotal || last_pivot_col[this_pivot_key]
+          subtotal_col.after = previous_subtotal || last_pivot_col[pivot]
           // console.log('......AFTER', subtotal_col.after)
-          last_pivot_key = this_pivot_key
+          last_pivot_key = pivot
           previous_subtotal = subtotal_col.id
           subtotals.push(subtotal_col)
-          sub_idx += 1
         }
       }
     }
@@ -872,13 +863,6 @@ const getNewConfigOptions = function(table) {
     }
   }
 
-  pivotComparisons = []
-  for (var i = 0; i < table.pivot_fields.length; i++) {
-    var option = {}
-    option['By ' + table.pivot_fields[i]] = table.pivot_fields[i]
-    pivotComparisons.push(option)
-  }
-
   for (var i = 0; i < table.measures.length; i++) {
     newOptions['label|' + table.measures[i].name] = {
       section: "Measures",
@@ -896,49 +880,57 @@ const getNewConfigOptions = function(table) {
       order: 100 + i * 10 + 3,
     }
 
-    comparisonOptions = []
-    if (table.measures[i].can_pivot) {
-      comparisonOptions = comparisonOptions.concat(pivotComparisons)
-    }
-    for (var j = i - 1; j >= 0; j--) {
-      var includeMeasure = table.measures[i].can_pivot === table.measures[j].can_pivot
-                            || table.has_row_totals && !table.measures[j].is_table_calculation
+    if (i > 0 || table.has_pivots) {
+      comparisonOptions = []
+      // pivoted measures
+      if (table.measures[i].can_pivot) {
+        pivotComparisons = []
+        for (var p = 0; p < table.pivot_fields.length; p++) {
+          var option = {}
+          option['By ' + table.pivot_fields[p]] = table.pivot_fields[p]
+          pivotComparisons.push(option)
+        }
+        comparisonOptions = comparisonOptions.concat(pivotComparisons)
+      }
+      // row totals and supermeasures
+      for (var j = i - 1; j >= 0; j--) {
+        var includeMeasure = table.measures[i].can_pivot === table.measures[j].can_pivot
+                              || 
+                            table.has_row_totals && !table.measures[j].is_table_calculation         
+        if (includeMeasure) {
+          var option = {}
+          option['vs. ' + table.measures[j].label] = table.measures[j].name
+          comparisonOptions.push(option)
+        }
+      }
+      comparisonOptions.reverse()
 
-                               
-      if (includeMeasure) {
-        var option = {}
-        option['vs. ' + table.measures[j].label] = table.measures[j].name
-        comparisonOptions.push(option)
+      newOptions['comparison|' + table.measures[i].name] = {
+        section: "Measures",
+        type: "string",
+        label: 'Comparison', // for ' + ( table.measures[i].label_short || table.measures[i].label ),
+        display: 'select',
+        values: comparisonOptions,
+        order: 100 + i * 10 + 2
+      }
+
+      newOptions['var_num|' + table.measures[i].name] = {
+        section: "Measures",
+        type: "boolean",
+        label: 'Var #',
+        display_size: 'third',
+        order: 100 + i * 10 + 4,
+      }
+
+      newOptions['var_pct|' + table.measures[i].name] = {
+        section: "Measures",
+        type: "boolean",
+        label: 'Var %',
+        display_size: 'third',
+        order: 100 + i * 10 + 3,
       }
     }
-    comparisonOptions.reverse()
-
-    newOptions['comparison|' + table.measures[i].name] = {
-      section: "Measures",
-      type: "string",
-      label: 'Comparison', // for ' + ( table.measures[i].label_short || table.measures[i].label ),
-      display: 'select',
-      values: comparisonOptions,
-      order: 100 + i * 10 + 2
-    }
-
-    newOptions['var_num|' + table.measures[i].name] = {
-      section: "Measures",
-      type: "boolean",
-      label: 'Var #',
-      display_size: 'third',
-      order: 100 + i * 10 + 4,
-    }
-
-    newOptions['var_pct|' + table.measures[i].name] = {
-      section: "Measures",
-      type: "boolean",
-      label: 'Var %',
-      display_size: 'third',
-      order: 100 + i * 10 + 3,
-    }
   }
-  console.log('newOptions', newOptions)
   return newOptions
 }
 
@@ -1031,6 +1023,14 @@ looker.plugins.visualizations.add({
     console.log('config', config)
     console.log('queryResponse', queryResponse)
 
+    if (queryResponse.fields.pivots.length > 2) {
+      this.addError({
+        title: "Max Two Pivots",
+        message: "This visualization accepts no more than 2 pivot fields."
+      });
+      return
+    }
+
     try {
       var elem = document.querySelector('#visContainer');
       elem.parentNode.removeChild(elem);  
@@ -1052,11 +1052,11 @@ looker.plugins.visualizations.add({
     lookerData = new LookerData(data, queryResponse, config)
     console.log(lookerData)
 
-    buildReportTable(lookerData)
-
     new_options = getNewConfigOptions(lookerData)
     this.trigger("registerOptions", new_options)
-    
+
+    buildReportTable(lookerData)
+
     // TODO: Hide vis until build complete
     done();
   }
