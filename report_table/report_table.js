@@ -70,6 +70,7 @@ class LookerData {
 
     this.has_totals = false
     this.has_subtotals = false
+    this.has_row_totals = queryResponse.has_row_totals || false
     this.has_pivots = false
     this.has_supers = false
 
@@ -558,8 +559,6 @@ class LookerData {
     }
     this.sortColumns()
 
-    console.log('updated this.columns', this.columns)
-
     // CALCULATE COLUMN SUB TOTALS
     for  (var r = 0; r < this.data.length; r++) {
       var row = this.data[r]
@@ -856,7 +855,6 @@ const getNewConfigOptions = function(table) {
   newOptions = options;
 
   for (var i = 0; i < table.dimensions.length; i++) {
-    console.log('getNewConfigOptions', table.dimensions[i].name)
     newOptions['label|' + table.dimensions[i].name] = {
       section: "Dimensions",
       type: "string",
@@ -872,6 +870,13 @@ const getNewConfigOptions = function(table) {
       display_size: 'third',
       order: i * 10 + 2,
     }
+  }
+
+  pivotComparisons = []
+  for (var i = 0; i < table.pivot_fields.length; i++) {
+    var option = {}
+    option['By ' + table.pivot_fields[i]] = table.pivot_fields[i]
+    pivotComparisons.push(option)
   }
 
   for (var i = 0; i < table.measures.length; i++) {
@@ -891,10 +896,29 @@ const getNewConfigOptions = function(table) {
       order: 100 + i * 10 + 3,
     }
 
+    comparisonOptions = []
+    if (table.measures[i].can_pivot) {
+      comparisonOptions = comparisonOptions.concat(pivotComparisons)
+    }
+    for (var j = i - 1; j >= 0; j--) {
+      var includeMeasure = table.measures[i].can_pivot === table.measures[j].can_pivot
+                            || table.has_row_totals && !table.measures[j].is_table_calculation
+
+                               
+      if (includeMeasure) {
+        var option = {}
+        option['vs. ' + table.measures[j].label] = table.measures[j].name
+        comparisonOptions.push(option)
+      }
+    }
+    comparisonOptions.reverse()
+
     newOptions['comparison|' + table.measures[i].name] = {
       section: "Measures",
       type: "string",
-      label: 'Comparison for ' + ( table.measures[i].label_short || table.measures[i].label ),
+      label: 'Comparison', // for ' + ( table.measures[i].label_short || table.measures[i].label ),
+      display: 'select',
+      values: comparisonOptions,
       order: 100 + i * 10 + 2
     }
 
