@@ -635,40 +635,42 @@ class LookerData {
     calcs.forEach(calc => {
       Object.keys(this.variances).forEach(v => {
         var variance = this.variances[v]
-        if (variance.type === 'vs_measure') {
-          if (!this.has_pivots) {
-            var id = ['$$$_variance_$$$', calc, variance.baseline, variance.comparison].join('|')
-            var column = new Column(id)
-            var baseline = this.getColumnById(variance.baseline)
-            var comparison = this.getColumnById(variance.comparison)
+        if (variance.comparison !== 'no_variance') {          
+          if (variance.type === 'vs_measure') {
+            if (!this.has_pivots) {
+              var id = ['$$$_variance_$$$', calc, variance.baseline, variance.comparison].join('|')
+              var column = new Column(id)
+              var baseline = this.getColumnById(variance.baseline)
+              var comparison = this.getColumnById(variance.comparison)
 
-            if (calc === 'absolute') {
-              column.idx = baseline.idx + 1
-              column.label = 'Var #'
+              if (calc === 'absolute') {
+                column.idx = baseline.idx + 1
+                column.label = 'Var #'
+              } else {
+                column.idx = baseline.idx + 2
+                column.label = 'Var %'
+              }
+              column.field = {
+                name: id
+              }
+              column.type = 'measure'
+              column.pivoted = baseline.pivoted
+              column.super_ = baseline.super
+              column.levels = []
+              column.pivot_key = ''
+              column.align = 'right'
+              column.sort_by_measure_values = [1, column.idx]
+              column.sort_by_pivot_values = [1, column.idx]
+
+              console.log('addVarianceColumn', column)
+              this.columns.push(column)
+              this.calculateVariance(id, calc, baseline, comparison)
             } else {
-              column.idx = baseline.idx + 2
-              column.label = 'Var %'
+              // pivoted measures
             }
-            column.field = {
-              name: id
-            }
-            column.type = 'measure'
-            column.pivoted = baseline.pivoted
-            column.super_ = baseline.super
-            column.levels = []
-            column.pivot_key = ''
-            column.align = 'right'
-            column.sort_by_measure_values = [1, column.idx]
-            column.sort_by_pivot_values = [1, column.idx]
-
-            console.log('addVarianceColumn', column)
-            this.columns.push(column)
-            this.calculateVariance(id, calc, baseline, comparison)
           } else {
-            // pivoted measures
+            // by_pivot
           }
-        } else {
-          // by_pivot
         }
       })
     })
@@ -1006,6 +1008,7 @@ const getNewConfigOptions = function(table) {
         }
       }
       comparisonOptions.reverse()
+      comparisonOptions.unshift({ '(none)': 'no_variance'})
 
       newOptions['comparison|' + table.measures[i].name] = {
         section: "Measures",
