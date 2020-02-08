@@ -1039,7 +1039,7 @@ const getNewConfigOptions = function(table) {
   return newOptions
 }
 
-const buildReportTable = function(lookerData) {
+const buildReportTable = function(lookerData, element) {
 
   var table = d3.select('#visContainer')
     .append('table')
@@ -1106,7 +1106,25 @@ const buildReportTable = function(lookerData) {
             }
             return classes.join(' ')
           })
-    console.log(table)
+
+  tfoot = table.append('tfoot')
+    .selectAll('tr')
+    .data([0]).enter()
+      .append('tr')
+      .selectAll('td')
+      .data([0]).enter()
+        .append('td')
+          .text('Table render size: ' + element.clientHeight + ' x ' + element.clientWidth)
+          .attr('colspan', 5);
+
+    // footer_comments = tfoot.insertRow();
+    // td = document.createElement('td');
+    // // td.setAttribute('colspan', cols);
+    // text = document.createTextNode();
+    // td.appendChild(text);
+    // footer_comments.appendChild(td);
+
+  console.log(table)
 }
 
 looker.plugins.visualizations.add({
@@ -1160,7 +1178,7 @@ looker.plugins.visualizations.add({
     new_options = getNewConfigOptions(lookerData)
     this.trigger("registerOptions", new_options)
 
-    buildReportTable(lookerData)
+    buildReportTable(lookerData, element)
 
     // TODO: Hide vis until build complete
     done();
