@@ -183,6 +183,7 @@ class LookerData {
       column.label = column.field.label_short || column.field.label
       column.view = column.field.view_label
       column.type = 'dimension'
+      column.align = 'left'
       column.pivoted = false
       column.super = false
       column.sort_by_measure_values = [0, col_idx, ...newArray(this.pivot_fields.length, 0)]
@@ -650,7 +651,7 @@ class LookerData {
       column.subtotal = true
       column.pivot_key = [subtotal.pivot, '$$$_subtotal_$$$'].join('|')
       column.field_name = subtotal.field
-      column.align = 'center' // left | center | right
+      column.align = 'right' // left | center | right
 
       this.columns.push(column)
     }
@@ -1154,7 +1155,6 @@ const getNewConfigOptions = function(table) {
 }
 
 const buildReportTable = function(lookerData) {
-
   var table = d3.select('#visContainer')
     .append('table')
     .attr("class", "reportTable");
@@ -1168,6 +1168,7 @@ const buildReportTable = function(lookerData) {
         return lookerData.getColumnsToDisplay(i).map(function(column) {
           var header = {
             'text': '',
+            'align': column.align,
             'colspan': column.colspans[i]
           }
           if (lookerData.sortColsBy == 'sort_by_pivot_values') {
@@ -1185,13 +1186,17 @@ const buildReportTable = function(lookerData) {
               header.text = column.levels[i - 1]
             }
           }
-
           return header
         })
       }).enter()
           .append('th')
           .text(d => d.text)
-          .attr('colspan', d => d.colspan);
+          .attr('colspan', d => d.colspan)
+          .attr('class', d => {
+            classes = []
+            if (typeof d.align !== 'undefined') { classes.push(d.align) }
+            return classes.join(' ')
+          })
   
   table.append('tbody')
     .selectAll('tr')
@@ -1208,7 +1213,7 @@ const buildReportTable = function(lookerData) {
       }).enter()
         .append('td')
           .text(d => d.rendered || d.value) 
-          .attr("rowspan", d => d.rowspan)
+          .attr('rowspan', d => d.rowspan)
           .attr('class', d => {
             classes = []
             if (typeof d.align !== 'undefined') { classes.push(d.align) }
