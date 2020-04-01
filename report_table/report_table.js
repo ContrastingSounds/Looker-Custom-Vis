@@ -234,6 +234,7 @@ class LookerData {
             column.label = column.field.label_short || column.field.label
             column.view = column.field.view_label
             column.type = 'measure'
+            column.align = 'right'
             column.pivoted = true
             column.super = false
             column.pivot_key = pivotKey
@@ -261,6 +262,7 @@ class LookerData {
         column.label = column.field.label_short || column.field.label
         column.view = column.field.view_label
         column.type = 'measure'
+        column.align = 'right'
         column.pivoted = false
         column.super = false
         column.sort_by_measure_values = [1, col_idx]
@@ -374,6 +376,7 @@ class LookerData {
       this.addSubTotals(config.subtotalDepth)
     }
 
+    // check that both column subtotals are 'on' in config, AND there are two levels of pivot
     var ColSubtotalsAreValid = config.colSubtotals && this.pivot_fields.length == 2
                                 //  || (this.pivot_fields.length == 1 && this.sortColsBy === 'sort_by_measure_values' )
     if (ColSubtotalsAreValid) {
@@ -689,14 +692,15 @@ class LookerData {
       var comparison_value = row.data[comparison.id].value
       if (calc === 'absolute') {
         var cell_value = {
-          align: 'right',
-          value: baseline_value - comparison_value
+          value: formatter(baseline_value - comparison_value)
         }
       } else {
         var cell_value = {
-          align: 'right',
-          value: (baseline_value - comparison_value) / comparison_value
+          value: formatter((baseline_value - comparison_value) / comparison_value)
         }
+      }
+      if (row.type == 'total') {
+        cell_value.cell_style = 'total'
       }
       row.data[id] = cell_value
     }
@@ -1198,7 +1202,7 @@ const buildReportTable = function(lookerData) {
         return lookerData.getRow(row).map(function(column) {
           var cell = row.data[column.id]
           cell.rowspan = column.rowspan
-          cell.align = column.field.aligns
+          cell.align = column.align
           return cell;
         })
       }).enter()
