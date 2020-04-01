@@ -2,6 +2,12 @@
 
 const formatter = d3.format(",.2f")
 
+/**
+ * Returns an array of given length, all populated with same value
+ * Convenience function e.g. to initialise arrays of zeroes or nulls
+ * @param {*} length 
+ * @param {*} value 
+ */
 const newArray = function(length, value) {
   var arr = []
   for (var l = 0; l < length; l++) {
@@ -10,6 +16,11 @@ const newArray = function(length, value) {
   return arr
 }
 
+/**
+ * Represents a row in the dataset that populates the table.
+ * This may be an addtional row (e.g. subtotal) not in the original query
+ * @class
+ */
 class Row {
   constructor(type) {
     this.id = ''
@@ -19,6 +30,14 @@ class Row {
   }
 }
 
+/**
+ * Represents a column in the dataset that populates the table.
+ * This may be an additional columns (e.g. subtotal, variance) not in the original query
+ * 
+ * Ensures all key vis properties (e.g. 'label') are consistent across different field types
+ * 
+ * @class
+ */
 class Column {
   constructor(id) {
     this.id = id
@@ -38,6 +57,11 @@ class Column {
     this.sort_by_pivot_values = []   // [index -1|dimension 0|measure 1|row totals & supermeasures 2, [pivot values], column number    ]
   }
 
+  /**
+   * Returns a header label for a column, to display in table vis
+   * @param {*} label_with_view - full field name including label e.g. "Users Name"
+   * @param {*} label_with_pivots - adds all pivot values "Total Users Q1 Male"
+   */
   getLabel (label_with_view=false, label_with_pivots=false) {
     var label = this.label
     if (label_with_view) { 
@@ -51,7 +75,29 @@ class Column {
   }
 }
 
+/**
+ * Represents an "enriched data object" with additional methods and properties for data vis
+ * Takes the data, config and queryResponse objects as inputs to the constructor
+ */
 class LookerData {
+  /**
+   * Build the LookerData object
+   * @constructor
+   * 
+   * 1. Check for pivots and supermeasures
+   * 2. Check for variance calculations
+   * 3. Build index column
+   * 4.   Index all original columns to preserve order later
+   * 5.   Add dimensions, list of ids, list of full objects
+   * 6.   Add measures, list of ids, list of full objects
+   * 7. Build rows
+   * 8. Build totals
+   * 9. Build row spans
+   * 
+   * @param {*} lookerData 
+   * @param {*} queryResponse 
+   * @param {*} config 
+   */
   constructor(lookerData, queryResponse, config) {
     this.columns = []
     this.dimensions = []
@@ -305,7 +351,11 @@ class LookerData {
             }
             totals_row.data[cellKey] = cellValue
           } else {
-            totals_row.data[column.id] == totals_[column.id]
+            var cellValue = totals_[column.id]
+            if (typeof cellValue.rendered == 'undefined' && typeof cellValue.html !== 'undefined' ){ // totals data may include html but not rendered value
+              cellValue.rendered = this.getRenderedFromHtml(cellValue)
+            }
+            totals_row.data[column.id] = cellValue
           }            
           totals_row.data[column.id].cell_style = 'total'
         }
@@ -333,6 +383,10 @@ class LookerData {
     this.sortColumns()
   }
 
+  /**
+   * Returns column that matches ID provided
+   * @param {*} id 
+   */
   getColumnById (id) {
     var column = {}
     this.columns.forEach(c => {
@@ -343,6 +397,10 @@ class LookerData {
     return column
   }
 
+  /**
+   * Performs vertical cell merge, by calculating required rowspan values
+   * Works backwards through the data rows.
+   */
   updateRowSpanValues () {
     var span_tracker = {}
     // loop backwards through data rows
@@ -383,6 +441,9 @@ class LookerData {
     }
   }
 
+  /**
+   * Sorts the rows of data, then updates vertical cell merge 
+   */
   sortData () {
     var compareRowSortValues = (a, b) => {
       var depth = a.sort.length
@@ -396,6 +457,9 @@ class LookerData {
     this.updateRowSpanValues()
   }
 
+  /**
+   * Sorts columns by config option (based on measure order or pivot heading sort order)
+   */
   sortColumns () {
     var compareColSortValues = (a, b) => {
       var param = this.sortColsBy
@@ -409,6 +473,12 @@ class LookerData {
     this.columns.sort(compareColSortValues)
   }
 
+  /**
+   * Generates subtotals values
+   * 
+   * 1. Build groupings / sort values
+   * 2. Generate data rows
+   */
   addSubTotals () { 
     var depth = this.addSubtotalDepth
 
@@ -474,8 +544,6 @@ class LookerData {
 
   /**
    * Generates new column subtotals, where 2 pivot levels have been used, or 1 pivot level sorted by measure values.
-   * 
-   * 
    */
   addColumnSubTotals () {
     // https://pebl.dev.looker.com/explore/pebl/trans?qid=Vm6kceDf5Xv51y3VugI71G&origin_space=6&toggle=pik,vis
@@ -607,6 +675,13 @@ class LookerData {
     return subtotals
   }
 
+  /**
+   * Variance calculation function to enable addVariance()
+   * @param {*} id 
+   * @param {*} calc 
+   * @param {*} baseline 
+   * @param {*} comparison 
+   */
   calculateVariance (id, calc, baseline, comparison) {
     for  (var r = 0; r < this.data.length; r++) {
       var row = this.data[r]
@@ -627,6 +702,9 @@ class LookerData {
     }
   }
 
+  /**
+   * Function to add variance columns directly within table vis rather than requiring a table calc
+   */
   addVarianceColumns () {
     console.log('addVarianceColumns() called')
     console.log('available measures:', this.measures)
@@ -676,12 +754,22 @@ class LookerData {
     })
   }
 
+  /**
+   * Extracts the formatted value of the field from the html: value
+   * There are cases (totals data) where the formatted value isn't available as usual rendered_value
+   * @param {*} cellValue 
+   */
   getRenderedFromHtml (cellValue) {
     var parser = new DOMParser()
     // console.log('cell to renderFromHtml', cellValue)
     if (cellValue.html !== '') {
-      var rendered = parser.parseFromString(cellValue.html, 'text/html')
-      rendered = rendered.getElementsByTagName('a')[0].innerText
+      try {
+        var rendered = parser.parseFromString(cellValue.html, 'text/html')
+        rendered = rendered.getElementsByTagName('a')[0].innerText
+      }
+      catch(TypeError) {
+        var rendered = cellValue.html
+      }
     } else {
       var rendered = cellValue.value
     }
@@ -693,6 +781,10 @@ class LookerData {
     return newArray(this.pivot_fields.length+1, 0)
   }
 
+  /**
+   * Performs horizontal cell merge of header values by calculating required colspan values
+   * @param {*} columns 
+   */
   setColSpans (columns) {
     // build single array of the header values
     // use column id for the label level
@@ -778,6 +870,10 @@ class LookerData {
     return columns
   }
 
+  /**
+   * Builds list of columns out of data set that should be displayed
+   * @param {*} i 
+   */
   getColumnsToDisplay (i) {
     // remove some dimension columns if we're just using a single index column
     if (this.useIndexColumn) {
@@ -820,6 +916,12 @@ class LookerData {
     return cells
   }
 
+  /**
+   * Returns dataset as a simple json object
+   * Includes line_items only (e.g. no row subtotals)
+   * 
+   * Convenience function when using LookerData as an object to support e.g. Vega Lite visualisations
+   */
   getSimpleJson() {
     var raw_values = []
     this.data.forEach(r => {
@@ -835,6 +937,10 @@ class LookerData {
   }
 }
 
+/**
+ * Adds CSS file provided as URL
+ * @param {*} link 
+ */
 const addCSS = link => {
   const linkElement = document.createElement('link');
 
@@ -946,6 +1052,10 @@ const options = {
   // }
 }
 
+/**
+ * Builds new config object based on available dimensions and measures
+ * @param {*} table 
+ */
 const getNewConfigOptions = function(table) {
   newOptions = options;
 
@@ -1039,7 +1149,7 @@ const getNewConfigOptions = function(table) {
   return newOptions
 }
 
-const buildReportTable = function(lookerData, element) {
+const buildReportTable = function(lookerData) {
 
   var table = d3.select('#visContainer')
     .append('table')
@@ -1047,7 +1157,7 @@ const buildReportTable = function(lookerData, element) {
 
   table.append('thead')
     .selectAll('tr')
-    .data(lookerData.getLevels()).enter()
+    .data(lookerData.getLevels()).enter() 
       .append('tr')
       .selectAll('th')
       .data(function(level, i) { 
@@ -1079,8 +1189,6 @@ const buildReportTable = function(lookerData, element) {
           .text(d => d.text)
           .attr('colspan', d => d.colspan);
   
-  var align = 'right'
-  // create table body
   table.append('tbody')
     .selectAll('tr')
     .data(lookerData.data).enter()
@@ -1112,10 +1220,10 @@ const buildReportTable = function(lookerData, element) {
     .data([0]).enter()
       .append('tr')
       .selectAll('td')
-      .data([0]).enter()
-        .append('td')
-          .text('Table render size: ' + element.clientHeight + ' x ' + element.clientWidth)
-          .attr('colspan', 5);
+      // .data([0]).enter()
+      //   .append('td')
+      //     .text('Table render size: ' + element.clientHeight + ' x ' + element.clientWidth)
+      //     .attr('colspan', 5);
 
     // footer_comments = tfoot.insertRow();
     // td = document.createElement('td');
@@ -1132,14 +1240,9 @@ looker.plugins.visualizations.add({
 
   create: function(element, config) {
     loadStylesheets();
-
-    // this.container = d3.select(element)
-    //   .append("div")
-    //   .attr("id", "visContainer")
   },
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
-    // Clear any errors from previous updates.
     this.clearErrors();
 
     console.log('data', data)
@@ -1163,22 +1266,13 @@ looker.plugins.visualizations.add({
       .append("div")
       .attr("id", "visContainer")
 
-    var visHeight = element.clientHeight - 16;
-
-    var fields = queryResponse.fields.dimension_like
-                  .concat(queryResponse.fields.measure_like)
-    
-    if (typeof queryResponse.fields.supermeasure_like !== 'undefined') {
-      fields = fields.concat(queryResponse.fields.supermeasure_like)
-    }
-
     lookerData = new LookerData(data, queryResponse, config)
     console.log(lookerData)
 
     new_options = getNewConfigOptions(lookerData)
     this.trigger("registerOptions", new_options)
 
-    buildReportTable(lookerData, element)
+    buildReportTable(lookerData)
 
     // TODO: Hide vis until build complete
     done();

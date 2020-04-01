@@ -14,8 +14,6 @@
     - Column subtotals to require / not require specific grouping or ordering?
     + Ensure subtotals are not generated for supermeasures
   - Remove labels_at_bottom if variable not being used
-  - Option to put total at top or bottom
-  - Option to put subtotals above or below rows
   - Ability to hide rows associated with a given subtotal
 - Formatting
   - Red for negatives
