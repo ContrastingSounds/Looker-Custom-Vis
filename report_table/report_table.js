@@ -55,6 +55,7 @@ class Column {
     this.super = false
     this.pivot_key = '' // queryResponse.pivots[n].key // single string that concats all pivot values
     this.align = '' // left | center | right
+    this.hide = false
 
     this.sort_by_measure_values = [] // [index -1|dimension 0|measure 1|row totals & supermeasures 2, column number, [measure values]  ]
     this.sort_by_pivot_values = []   // [index -1|dimension 0|measure 1|row totals & supermeasures 2, [pivot values], column number    ]
@@ -204,6 +205,8 @@ class LookerData {
       column.sort_by_measure_values = [0, col_idx, ...newArray(this.pivot_fields.length, 0)]
       column.sort_by_pivot_values = [0, ...newArray(this.pivot_fields.length, 0), col_idx]
 
+      // TODO: Hide function
+
       this.columns.push(column)
       col_idx += 10
     }
@@ -264,6 +267,8 @@ class LookerData {
               column.sort_by_pivot_values = [2, ...newArray(this.pivot_fields.length, 0), col_idx]
             }
 
+            // TODO: Hide function
+
             this.columns.push(column)
             col_idx += 10
           }
@@ -284,6 +289,13 @@ class LookerData {
         column.sort_by_measure_values = [1, col_idx]
         column.sort_by_pivot_values = [1, col_idx]
         this.columns.push(column)
+
+        if (typeof config['format|' + column.id] !== 'undefined') {
+          if (config['format|' + column.id] === 'hide') {
+            column.hide = true
+          }
+        }
+
         col_idx += 10
       }
     }
@@ -310,6 +322,7 @@ class LookerData {
         column.super = true
         column.sort_by_measure_values = [2, col_idx, ...newArray(this.pivot_fields.length, 1)]
         column.sort_by_pivot_values = [2, ...newArray(this.pivot_fields.length, 1), col_idx]
+        // TODO: Hide function
         this.columns.push(column)
         col_idx += 10
       }
@@ -909,9 +922,9 @@ class LookerData {
   getColumnsToDisplay (i) {
     // remove some dimension columns if we're just using a single index column
     if (this.useIndexColumn) {
-      var columns = this.columns.filter(c => c.type == 'measure' || c.id == '$$$_index_$$$')
+      var columns = this.columns.filter(c => c.type == 'measure' || c.id == '$$$_index_$$$').filter(c => !c.hide)
     } else {
-      var columns =  this.columns.filter(c => c.id !== '$$$_index_$$$')
+      var columns =  this.columns.filter(c => c.id !== '$$$_index_$$$').filter(c => !c.hide)
     }
 
     // update list with colspans
@@ -924,9 +937,9 @@ class LookerData {
   getRow (row) {
     // filter out unwanted dimensions based on index_column setting
     if (this.useIndexColumn) {
-      var cells = this.columns.filter(c => c.type == 'measure' || c.id == '$$$_index_$$$')
+      var cells = this.columns.filter(c => c.type == 'measure' || c.id == '$$$_index_$$$').filter(c => !c.hide)
     } else {
-      var cells =  this.columns.filter(c => c.id !== '$$$_index_$$$')
+      var cells =  this.columns.filter(c => c.id !== '$$$_index_$$$').filter(c => !c.hide)
     }
     
     // if we're using all dimensions, and we've got span_rows on, need to update the row
