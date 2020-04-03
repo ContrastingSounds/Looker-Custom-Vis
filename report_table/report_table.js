@@ -766,7 +766,7 @@ class LookerDataTable {
       } else {
         var cell_value = {
           value: (baseline_value - comparison_value) / comparison_value,
-          rendered: formatter((baseline_value - comparison_value) / comparison_value) + '%',
+          rendered: formatter(100 * (baseline_value - comparison_value) / comparison_value) + '%',
           cell_style: []
         }
       }
