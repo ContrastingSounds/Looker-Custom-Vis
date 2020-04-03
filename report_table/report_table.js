@@ -1,7 +1,7 @@
 /* https://raw.githack.com/ContrastingSounds/Looker-Custom-Vis/master/report_table/report_table.js */
 /* Dependency: https://cdnjs.cloudflare.com/ajax/libs/d3/5.15.0/d3.min.js */
 
-const formatter = d3.format(",.2f")
+const formatter = d3.format(',.2f')
 // const css_link = 'https://raw.githack.com/ContrastingSounds/Looker-Custom-Vis/master/report_table/report_table.css'
 const css_link = 'https://jwtest.ngrok.io/report_table/report_table.css'
 
@@ -143,16 +143,29 @@ class LookerData {
 
     // CHECK FOR VARIANCE CALCULATIONS
     Object.keys(config).forEach(option => {
+      console.log('config option:', option, config[option])
       if (option.startsWith('comparison')) {
+        var baseline = option.split('|')[1]
+
         if (this.pivot_fields.includes(config[option])) {
           var type = 'by_pivot'
         } else {
           var type = 'vs_measure'
         }
+
+        if (typeof config['switch|' + baseline] !== 'undefined') {
+          if (config['switch|' + baseline]) {
+            var reverse = true
+          } else {
+            var reverse = false
+          }
+        }
+
         this.variances.push({
-          baseline: option.split('|')[1],
+          baseline: baseline,
           comparison: config[option],
-          type: type
+          type: type,
+          reverse: reverse
         })
       }
     })
@@ -757,7 +770,11 @@ class LookerData {
 
               console.log('addVarianceColumn', column)
               this.columns.push(column)
-              this.calculateVariance(id, calc, baseline, comparison)
+              if (variance.reverse) {
+                this.calculateVariance(id, calc, comparison, baseline)
+              } else {
+                this.calculateVariance(id, calc, baseline, comparison)
+              }
             } else {
               // pivoted measures
             }
@@ -1076,16 +1093,16 @@ const getNewConfigOptions = function(table) {
 
   for (var i = 0; i < table.dimensions.length; i++) {
     newOptions['label|' + table.dimensions[i].name] = {
-      section: "Dimensions",
-      type: "string",
+      section: 'Dimensions',
+      type: 'string',
       label: table.dimensions[i].label,
       default: table.dimensions[i].label,
       order: i * 10 + 1,
     }
 
     newOptions['hide|' + table.dimensions[i].name] = {
-      section: "Dimensions",
-      type: "boolean",
+      section: 'Dimensions',
+      type: 'boolean',
       label: 'Hide',
       display_size: 'third',
       order: i * 10 + 2,
@@ -1094,71 +1111,82 @@ const getNewConfigOptions = function(table) {
 
   for (var i = 0; i < table.measures.length; i++) {
     newOptions['label|' + table.measures[i].name] = {
-      section: "Measures",
-      type: "string",
+      section: 'Measures',
+      type: 'string',
       label: table.measures[i].label_short || table.measures[i].label,
       default: table.measures[i].label_short || table.measures[i].label,
       order: 100 + i * 10 + 1,
     }
 
-    newOptions['hide|' + table.measures[i].name] = {
-      section: "Measures",
-      type: "boolean",
-      label: 'Hide',
-      display_size: 'third',
-      order: 100 + i * 10 + 3,
+    newOptions['format|' + table.measures[i].name] = {
+      section: 'Measures',
+      type: 'string',
+      label: 'Format',
+      display: 'select',
+      values: [
+        {'Conditional Formating': 'conditional_formating'},
+        {'Hide': 'hide'}
+      ],
+      order: 100 + i * 10 + 2
     }
 
-    if (i > 0 || table.has_pivots) {
-      comparisonOptions = []
-      // pivoted measures
-      if (table.measures[i].can_pivot) {
-        pivotComparisons = []
-        for (var p = 0; p < table.pivot_fields.length; p++) {
-          var option = {}
-          option['By ' + table.pivot_fields[p]] = table.pivot_fields[p]
-          pivotComparisons.push(option)
-        }
-        comparisonOptions = comparisonOptions.concat(pivotComparisons)
+    comparisonOptions = []
+    // pivoted measures
+    if (table.measures[i].can_pivot) {
+      pivotComparisons = []
+      for (var p = 0; p < table.pivot_fields.length; p++) {
+        var option = {}
+        option['By ' + table.pivot_fields[p]] = table.pivot_fields[p]
+        pivotComparisons.push(option)
       }
-      // row totals and supermeasures
-      for (var j = i - 1; j >= 0; j--) {
-        var includeMeasure = table.measures[i].can_pivot === table.measures[j].can_pivot
-                              || 
-                            table.has_row_totals && !table.measures[j].is_table_calculation         
-        if (includeMeasure) {
-          var option = {}
-          option['vs. ' + table.measures[j].label] = table.measures[j].name
-          comparisonOptions.push(option)
-        }
+      comparisonOptions = comparisonOptions.concat(pivotComparisons)
+    }
+    // row totals and supermeasures
+    // for (var i = 0; i < table.measures.length; i++) {
+    for (var j = 0; j < table.measures.length; j++) {
+      var includeMeasure = table.measures[i].can_pivot === table.measures[j].can_pivot
+                            || 
+                          table.has_row_totals && !table.measures[j].is_table_calculation         
+      if (i != j && includeMeasure) {
+        var option = {}
+        option['vs. ' + table.measures[j].label] = table.measures[j].name
+        comparisonOptions.push(option)
       }
-      comparisonOptions.reverse()
-      comparisonOptions.unshift({ '(none)': 'no_variance'})
+    }
+    // comparisonOptions.reverse()
+    comparisonOptions.unshift({ '(none)': 'no_variance'})
 
-      newOptions['comparison|' + table.measures[i].name] = {
-        section: "Measures",
-        type: "string",
-        label: 'Comparison', // for ' + ( table.measures[i].label_short || table.measures[i].label ),
-        display: 'select',
-        values: comparisonOptions,
-        order: 100 + i * 10 + 2
-      }
+    newOptions['comparison|' + table.measures[i].name] = {
+      section: 'Measures',
+      type: 'string',
+      label: 'Comparison', // for ' + ( table.measures[i].label_short || table.measures[i].label ),
+      display: 'select',
+      values: comparisonOptions,
+      order: 100 + i * 10 + 5
+    }
 
-      newOptions['var_num|' + table.measures[i].name] = {
-        section: "Measures",
-        type: "boolean",
-        label: 'Var #',
-        display_size: 'third',
-        order: 100 + i * 10 + 4,
-      }
+    newOptions['switch|' + table.measures[i].name] = {
+      section: 'Measures',
+      type: 'boolean',
+      label: 'Switch',
+      display_size: 'third',
+      order: 100 + i * 10 + 6,
+    }
 
-      newOptions['var_pct|' + table.measures[i].name] = {
-        section: "Measures",
-        type: "boolean",
-        label: 'Var %',
-        display_size: 'third',
-        order: 100 + i * 10 + 3,
-      }
+    newOptions['var_num|' + table.measures[i].name] = {
+      section: 'Measures',
+      type: 'boolean',
+      label: 'Var #',
+      display_size: 'third',
+      order: 100 + i * 10 + 7,
+    }
+
+    newOptions['var_pct|' + table.measures[i].name] = {
+      section: 'Measures',
+      type: 'boolean',
+      label: 'Var %',
+      display_size: 'third',
+      order: 100 + i * 10 + 8,
     }
   }
   return newOptions
@@ -1167,7 +1195,7 @@ const getNewConfigOptions = function(table) {
 const buildReportTable = function(lookerData) {
   var table = d3.select('#visContainer')
     .append('table')
-    .attr("class", "reportTable");
+    .attr('class', 'reportTable');
 
   table.append('thead')
     .selectAll('tr')
@@ -1269,8 +1297,8 @@ looker.plugins.visualizations.add({
 
     if (queryResponse.fields.pivots.length > 2) {
       this.addError({
-        title: "Max Two Pivots",
-        message: "This visualization accepts no more than 2 pivot fields."
+        title: 'Max Two Pivots',
+        message: 'This visualization accepts no more than 2 pivot fields.'
       });
       return
     }
@@ -1281,14 +1309,14 @@ looker.plugins.visualizations.add({
     } catch(e) {}    
 
     this.container = d3.select(element)
-      .append("div")
-      .attr("id", "visContainer")
+      .append('div')
+      .attr('id', 'visContainer')
 
     lookerData = new LookerData(data, queryResponse, config)
     console.log(lookerData)
 
     new_options = getNewConfigOptions(lookerData)
-    this.trigger("registerOptions", new_options)
+    this.trigger('registerOptions', new_options)
 
     buildReportTable(lookerData)
 
