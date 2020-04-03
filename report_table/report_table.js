@@ -83,7 +83,7 @@ class Column {
  * Represents an "enriched data object" with additional methods and properties for data vis
  * Takes the data, config and queryResponse objects as inputs to the constructor
  */
-class LookerData {
+class LookerDataTable {
   /**
    * Build the LookerData object
    * @constructor
@@ -163,7 +163,6 @@ class LookerData {
 
   checkVarianceCalculations(config) {
     Object.keys(config).forEach(option => {
-      console.log('config option:', option, config[option])
       if (option.startsWith('comparison')) {
         var baseline = option.split('|')[1]
 
@@ -369,6 +368,11 @@ class LookerData {
         } else {
           row.data[column.id] = lookerData[i][column.id]
         }
+        if (typeof row.data[column.id] !== 'undefined') {
+          if (typeof row.data[column.id].cell_style === 'undefined') {
+            row.data[column.id].cell_style = []
+          }
+        }
       }
 
       // set a unique id for the row
@@ -434,13 +438,19 @@ class LookerData {
    * Applies conditional formatting (red if negative) to all measure columns set to use it 
    */
   applyFormatting(config) {
-    // for (var c = 0; c < this.columns.length; c++) {
-    //   if (typeof config[]) {
-    //     if () {
-
-    //     }
-    //   }
-    // }
+    for (var c = 0; c < this.columns.length; c++) {
+      var col = this.columns[c]
+      if (typeof config['format|' + col.id] !== 'undefined') {
+        if (config['format|' + col.id] == 'conditional_formatting') {
+          for (var r = 0; r < this.data.length; r++) {
+            var row = this.data[r]
+            if (row.data[col.id].value < 0) {
+              row.data[col.id].cell_style.push('red')
+            }
+          }
+        }
+      }
+    }
   }
 
   /**
@@ -760,7 +770,7 @@ class LookerData {
           cell_style: []
         }
       }
-      if (row.type == 'total') {
+      if (row.type == 'total' || row.type == 'subtotal') {
         cell_value.cell_style.push('total')
       }
       if (cell_value.value < 0) {
@@ -1165,7 +1175,7 @@ const getNewConfigOptions = function(table) {
       display: 'select',
       values: [
         {'Normal': 'normal'},
-        {'Conditional Formating': 'conditional_formating'},
+        {'Conditional Formatting': 'conditional_formatting'},
         {'Hide': 'hide'}
       ],
       order: 100 + i * 10 + 2
@@ -1353,13 +1363,13 @@ looker.plugins.visualizations.add({
       .append('div')
       .attr('id', 'visContainer')
 
-    lookerData = new LookerData(data, queryResponse, config)
-    console.log(lookerData)
+    lookerDataTable = new LookerDataTable(data, queryResponse, config)
+    console.log(lookerDataTable)
 
-    new_options = getNewConfigOptions(lookerData)
+    new_options = getNewConfigOptions(lookerDataTable)
     this.trigger('registerOptions', new_options)
 
-    buildReportTable(lookerData)
+    buildReportTable(lookerDataTable)
 
     // TODO: Hide vis until build complete
     done();
