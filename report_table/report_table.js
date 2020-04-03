@@ -1,6 +1,9 @@
+/* https://raw.githack.com/ContrastingSounds/Looker-Custom-Vis/master/report_table/report_table.js */
 /* Dependency: https://cdnjs.cloudflare.com/ajax/libs/d3/5.15.0/d3.min.js */
 
 const formatter = d3.format(",.2f")
+// const css_link = 'https://raw.githack.com/ContrastingSounds/Looker-Custom-Vis/master/report_table/report_table.css'
+const css_link = 'https://jwtest.ngrok.io/report_table/report_table.css'
 
 /**
  * Returns an array of given length, all populated with same value
@@ -153,7 +156,6 @@ class LookerData {
         })
       }
     })
-    console.log('Variances', this.variances)
 
     // BUILD INDEX COLUMN 
     var index_column = new Column('$$$_index_$$$')
@@ -324,7 +326,7 @@ class LookerData {
       // set an index value (note: this is an index purely for display purposes; row.id remains the unique reference value)
       var last_dim = this.dimensions[this.dimensions.length - 1].name
       var last_dim_value = lookerData[i][last_dim].value
-      row.data['$$$_index_$$$'] = { 'value': last_dim_value, 'cell_style': 'indent' }
+      row.data['$$$_index_$$$'] = { 'value': last_dim_value, 'cell_style': ['indent'] }
 
       row.sort = [0, 0, i]
       this.data.push(row)
@@ -341,30 +343,31 @@ class LookerData {
         totals_row.data[column.id] = { 'value': '' } // set a default on all columns
 
         if (column.id == this.dimensions[this.dimensions.length-1].name) {
-          totals_row.data[column.id] = { 'value': 'TOTAL', 'cell_style': 'total' }
+          totals_row.data[column.id] = { 'value': 'TOTAL', 'cell_style': ['total'] }
         } 
 
         if (column.type == 'measure') {
           if (column.pivoted == true) {
             var cellKey = [column.pivot_key, column.field_name].join('.')
             var cellValue = totals_[column.field_name][column.pivot_key]
-            cellValue.cell_style = 'total'
+            cellValue.cell_style = ['total']
             if (typeof cellValue.rendered == 'undefined' && typeof cellValue.html !== 'undefined' ){ // totals data may include html but not rendered value
               cellValue.rendered = this.getRenderedFromHtml(cellValue)
             }
             totals_row.data[cellKey] = cellValue
           } else {
             var cellValue = totals_[column.id]
+            cellValue.cell_style = ['total']
             if (typeof cellValue.rendered == 'undefined' && typeof cellValue.html !== 'undefined' ){ // totals data may include html but not rendered value
               cellValue.rendered = this.getRenderedFromHtml(cellValue)
             }
             totals_row.data[column.id] = cellValue
           }            
-          totals_row.data[column.id].cell_style = 'total'
+          totals_row.data[column.id].cell_style = ['total']
         }
       } 
       totals_row.sort = [1, 0, 0]
-      totals_row.data['$$$_index_$$$'] = { 'value': 'TOTAL', cell_style: 'total' }
+      totals_row.data['$$$_index_$$$'] = { 'value': 'TOTAL', cell_style: ['total'] }
 
       this.data.push(totals_row)
       this.has_totals = true
@@ -515,7 +518,7 @@ class LookerData {
 
         if (this.columns[d].id === '$$$_index_$$$' || d === this.dimensions.length ) {
           var subtotal_label = subTotals[s].join(' | ')
-          subtotal.data[this.columns[d]['id']] = {'value':  subtotal_label, 'cell_style': 'total'}
+          subtotal.data[this.columns[d]['id']] = {'value':  subtotal_label, 'cell_style': ['total']}
         } 
 
         if (column.type == 'measure') {
@@ -534,7 +537,7 @@ class LookerData {
           var cellValue = {
             value: subtotal_value,
             rendered: formatter(subtotal_value), 
-            cell_style: 'total'
+            cell_style: ['total']
           }
           subtotal.data[cellKey] = cellValue
         }
@@ -672,7 +675,7 @@ class LookerData {
           rendered: formatter(subtotal_value),
           align: 'right'
         }
-        if (row.type == 'total') { row.data[subtotal.id].cell_style = 'total' }
+        if (row.type == 'total') { row.data[subtotal.id].cell_style = ['total'] }
       }
     }
 
@@ -693,15 +696,22 @@ class LookerData {
       var comparison_value = row.data[comparison.id].value
       if (calc === 'absolute') {
         var cell_value = {
-          value: formatter(baseline_value - comparison_value)
+          value: baseline_value - comparison_value,
+          rendered: formatter(baseline_value - comparison_value),
+          cell_style: []
         }
       } else {
         var cell_value = {
-          value: formatter((baseline_value - comparison_value) / comparison_value)
+          value: (baseline_value - comparison_value) / comparison_value,
+          rendered: formatter((baseline_value - comparison_value) / comparison_value) + '%',
+          cell_style: []
         }
       }
       if (row.type == 'total') {
-        cell_value.cell_style = 'total'
+        cell_value.cell_style.push('total')
+      }
+      if (cell_value.value < 0) {
+        cell_value.cell_style.push('red')
       }
       row.data[id] = cell_value
     }
@@ -956,7 +966,7 @@ const addCSS = link => {
 };
 
 const loadStylesheets = () => {
-  addCSS('https://raw.githack.com/ContrastingSounds/Looker-Custom-Vis/report_table_dev/report_table/report_table.css');
+  addCSS(css_link);
 };
 
 const options = {
@@ -1193,7 +1203,7 @@ const buildReportTable = function(lookerData) {
           .text(d => d.text)
           .attr('colspan', d => d.colspan)
           .attr('class', d => {
-            classes = []
+            var classes = []
             if (typeof d.align !== 'undefined') { classes.push(d.align) }
             return classes.join(' ')
           })
@@ -1215,11 +1225,10 @@ const buildReportTable = function(lookerData) {
           .text(d => d.rendered || d.value) 
           .attr('rowspan', d => d.rowspan)
           .attr('class', d => {
-            classes = []
+            var classes = []
             if (typeof d.align !== 'undefined') { classes.push(d.align) }
             if (typeof d.cell_style !== 'undefined') { 
-              var styles = d.cell_style.split(' ')
-              classes = classes.concat(styles) 
+              classes = classes.concat(d.cell_style) 
             }
             return classes.join(' ')
           })

@@ -1,3 +1,5 @@
+/* https://raw.githack.com/ContrastingSounds/Looker-Custom-Vis/master/report_table/report_table.css */
+
 table.reportTable {
   font-family: Open Sans,Helvetica,Arial,sans-serif;
   font-size: 10px;   
@@ -48,4 +50,8 @@ table.reportTable td {
 .total {
   border-top: 2px solid #000000 !important;
   font-weight: bold !important;
+}
+
+.red {
+  color: red;
 }
