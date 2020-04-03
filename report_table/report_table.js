@@ -142,7 +142,26 @@ class LookerData {
       this.has_supers = true
     }
 
-    // CHECK FOR VARIANCE CALCULATIONS
+    var col_idx = 0
+    this.checkVarianceCalculations(config)
+    this.buildIndexColumn(queryResponse)
+    this.addDimensions(config, queryResponse, col_idx)
+    this.addMeasures(config, queryResponse, col_idx)
+    this.buildRows(lookerData)
+    this.buildTotals(queryResponse)
+    this.updateRowSpanValues()
+    if (config.rowSubtotals) {
+      this.addSubTotals(config.subtotalDepth)
+    }
+    if (config.colSubtotals && this.pivot_fields.length == 2) {
+      this.addColumnSubTotals()
+    }
+    this.addVarianceColumns()
+    this.sortColumns()
+    this.applyFormatting(config)
+  }
+
+  checkVarianceCalculations(config) {
     Object.keys(config).forEach(option => {
       console.log('config option:', option, config[option])
       if (option.startsWith('comparison')) {
@@ -170,20 +189,9 @@ class LookerData {
         })
       }
     })
+  }
 
-    // BUILD INDEX COLUMN 
-    var index_column = new Column('$$$_index_$$$')
-    index_column.align = 'left'
-    index_column.levels = newArray(queryResponse.fields.pivots.length, '')
-    index_column.sort_by_measure_values = [-1, 0, ...newArray(this.pivot_fields.length, 0)]
-    index_column.sort_by_pivot_values = [-1, ...newArray(this.pivot_fields.length, 0), 0]
-
-    this.columns.push(index_column)
-
-    // index all original columns to preserve order later
-    var col_idx = 0
-
-    // add dimensions, list of ids, list of full objects
+  addDimensions(config, queryResponse, col_idx) {
     for (var d = 0; d < queryResponse.fields.dimension_like.length; d++) {
       this.dimensions.push({
         name: queryResponse.fields.dimension_like[d].name,
@@ -205,12 +213,18 @@ class LookerData {
       column.sort_by_measure_values = [0, col_idx, ...newArray(this.pivot_fields.length, 0)]
       column.sort_by_pivot_values = [0, ...newArray(this.pivot_fields.length, 0), col_idx]
 
-      // TODO: Hide function
+      if (typeof config['hide|' + column.id] !== 'undefined') {
+        if (config['hide|' + column.id]) {
+          column.hide = true
+        }
+      }
 
       this.columns.push(column)
       col_idx += 10
     }
+  }
 
+  addMeasures(config, queryResponse, col_idx) {
     // add measures, list of ids
     for (var m = 0; m < queryResponse.fields.measure_like.length; m++) {
       this.measures.push({
@@ -221,7 +235,7 @@ class LookerData {
         can_pivot: true
       }) 
     }
-
+    
     // add measures, list of full objects
     if (this.has_pivots) {
       for (var p = 0; p < this.pivot_values.length; p++) {
@@ -322,13 +336,28 @@ class LookerData {
         column.super = true
         column.sort_by_measure_values = [2, col_idx, ...newArray(this.pivot_fields.length, 1)]
         column.sort_by_pivot_values = [2, ...newArray(this.pivot_fields.length, 1), col_idx]
-        // TODO: Hide function
+        if (typeof config['format|' + column.id] !== 'undefined') {
+          if (config['format|' + column.id] === 'hide') {
+            column.hide = true
+          }
+        }
         this.columns.push(column)
         col_idx += 10
       }
     }
+  }
 
-    // BUILD ROWS
+  buildIndexColumn(queryResponse) {
+    var index_column = new Column('$$$_index_$$$')
+    index_column.align = 'left'
+    index_column.levels = newArray(queryResponse.fields.pivots.length, '')
+    index_column.sort_by_measure_values = [-1, 0, ...newArray(this.pivot_fields.length, 0)]
+    index_column.sort_by_pivot_values = [-1, ...newArray(this.pivot_fields.length, 0), 0]
+
+    this.columns.push(index_column)
+  }
+
+  buildRows(lookerData) {
     for (var i = 0; i < lookerData.length; i++) {
       var row = new Row('line_item') // TODO: consider creating the row object once all required field values identified
       
@@ -357,8 +386,9 @@ class LookerData {
       row.sort = [0, 0, i]
       this.data.push(row)
     }
-  
-    // BUILD TOTALS
+  }
+
+  buildTotals(queryResponse) {
     if (typeof queryResponse.totals_data !== 'undefined') {
       var totals_ = queryResponse.totals_data
 
@@ -398,22 +428,19 @@ class LookerData {
       this.data.push(totals_row)
       this.has_totals = true
     }
+  }
 
-    // BUILD ROW SPANS
-    this.updateRowSpanValues()
+  /**
+   * Applies conditional formatting (red if negative) to all measure columns set to use it 
+   */
+  applyFormatting(config) {
+    // for (var c = 0; c < this.columns.length; c++) {
+    //   if (typeof config[]) {
+    //     if () {
 
-    if (config.rowSubtotals) {
-      this.addSubTotals(config.subtotalDepth)
-    }
-
-    // check that both column subtotals are 'on' in config, AND there are two levels of pivot
-    var ColSubtotalsAreValid = config.colSubtotals && this.pivot_fields.length == 2
-                                //  || (this.pivot_fields.length == 1 && this.sortColsBy === 'sort_by_measure_values' )
-    if (ColSubtotalsAreValid) {
-      this.addColumnSubTotals()
-    }
-    this.addVarianceColumns()
-    this.sortColumns()
+    //     }
+    //   }
+    // }
   }
 
   /**
@@ -1137,6 +1164,7 @@ const getNewConfigOptions = function(table) {
       label: 'Format',
       display: 'select',
       values: [
+        {'Normal': 'normal'},
         {'Conditional Formating': 'conditional_formating'},
         {'Hide': 'hide'}
       ],
