@@ -13,12 +13,11 @@
     + Method for sorting columns
     - Column subtotals to require / not require specific grouping or ordering?
     + Ensure subtotals are not generated for supermeasures
-  - Remove labels_at_bottom if variable not being used
   - Ability to hide rows associated with a given subtotal
 - Formatting
-  - Red for negatives
+  + Red for negatives
   - Brackets for negatives
-  - Bold top border for subtotals
+  + Bold top border for subtotals
   - Top & bottom border for totals
   - Up/down/steady bullets ( △ ▽ ▷ )
 - Calculations
@@ -120,9 +119,9 @@ Design
 
 ## Adding a variance
 
-- Make it easy to select a column and create a variance against another
++ Make it easy to select a column and create a variance against another
 - Variance should be absolute and relative (%), with option of which to display
-- Ability to show negative variance in red text
++ Ability to show negative variance in red text
 - Ability to add up/down/steady indicator
 - Flavours of variance
   - Actual vs Plan

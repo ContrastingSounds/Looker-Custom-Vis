@@ -56,9 +56,11 @@ class Column {
     this.pivot_key = '' // queryResponse.pivots[n].key // single string that concats all pivot values
     this.align = '' // left | center | right
     this.hide = false
+    // this.spacer = false
 
     this.sort_by_measure_values = [] // [index -1|dimension 0|measure 1|row totals & supermeasures 2, column number, [measure values]  ]
     this.sort_by_pivot_values = []   // [index -1|dimension 0|measure 1|row totals & supermeasures 2, [pivot values], column number    ]
+    // this.sort_by_group_values = []  // [index -1|dimension 0| [header values], column number    ]
   }
 
   /**
@@ -159,6 +161,12 @@ class LookerDataTable {
     this.addVarianceColumns()
     this.sortColumns()
     this.applyFormatting(config)
+
+    // TODO: more formatting options
+    // addSpacerColumns
+    // addGroupHeaders
+    // addUnitHeaders
+    // addRowNumbers // to Index Column only?
   }
 
   checkVarianceCalculations(config) {
@@ -764,9 +772,10 @@ class LookerDataTable {
           cell_style: []
         }
       } else {
+        var value = (baseline_value - comparison_value) / Math.abs(comparison_value)
         var cell_value = {
-          value: (baseline_value - comparison_value) / comparison_value,
-          rendered: formatter(100 * (baseline_value - comparison_value) / comparison_value) + '%',
+          value: value,
+          rendered: formatter(100 * value) + '%',
           cell_style: []
         }
       }
