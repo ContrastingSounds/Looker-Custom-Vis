@@ -45,6 +45,7 @@ class Column {
   constructor(id) {
     this.id = id
     this.idx = 0
+    this.pos = 0
     this.label = '' // queryResponse.fields.measures[n].label_short
     this.view = '' // queryResponse.fields.measures[n].view_label
     this.levels = []
@@ -52,6 +53,7 @@ class Column {
     this.field_name = ''
     this.type = '' // dimension | measure
     this.pivoted = false
+    this.subtotal = false
     this.super = false
     this.pivot_key = '' // queryResponse.pivots[n].key // single string that concats all pivot values
     this.align = '' // left | center | right
@@ -78,6 +80,22 @@ class Column {
       label = [label, pivots].join(' ') 
     }
     return label
+  }
+
+  updateSortByMeasures (idx) {
+    if (this.sort_by_measure_values[0] == 1) {
+      if (!this.pivoted && !this.subtotal) {
+        this.sort_by_measure_values = [1, idx]
+      }
+    }
+  }
+
+  getSortByMeasures () {
+    return this.sort_by_measure_values
+  }
+
+  getSortByPivots () {
+    return this.sort_by_pivot_values
   }
 }
 
@@ -119,7 +137,7 @@ class LookerDataTable {
     this.addSubtotalDepth = config.subtotalDepth || this.dimensions.length - 1
     this.spanRows = false || config.spanRows
     this.spanCols = false || config.spanCols
-    this.sortColsBy = config.sortColumnsBy || 'sort_by_pivot_values'
+    this.sortColsBy = config.sortColumnsBy || 'getSortByPivots'
 
     this.has_totals = false
     this.has_subtotals = false
@@ -302,6 +320,16 @@ class LookerDataTable {
       for (var m = 0; m < this.measures.length; m++) {
         var column = new Column(this.measures[m].name)
         column.idx = col_idx
+        try {
+          if (typeof config.columnOrder[column.id] !== 'undefined') {
+            column.pos = config.columnOrder[column.id]
+          } else {
+            column.pos = col_idx
+          }
+        }
+        catch {
+          column.pos = col_idx
+        }
         column.field = queryResponse.fields.measure_like[m]
         column.label = column.field.label_short || column.field.label
         column.view = column.field.view_label
@@ -309,8 +337,8 @@ class LookerDataTable {
         column.align = 'right'
         column.pivoted = false
         column.super = false
-        column.sort_by_measure_values = [1, col_idx]
-        column.sort_by_pivot_values = [1, col_idx]
+        column.sort_by_measure_values = [1, column.pos]
+        column.sort_by_pivot_values = [1, column.pos]
         this.columns.push(column)
 
         if (typeof config['style|' + column.id] !== 'undefined') {
@@ -543,10 +571,10 @@ class LookerDataTable {
   sortColumns () {
     var compareColSortValues = (a, b) => {
       var param = this.sortColsBy
-      var depth = a[param].length
+      var depth = a[param]().length
       for(var i=0; i<depth; i++) {
-          if (a[param][i] > b[param][i]) { return 1 }
-          if (a[param][i] < b[param][i]) { return -1 }
+          if (a[param]()[i] > b[param]()[i]) { return 1 }
+          if (a[param]()[i] < b[param]()[i]) { return -1 }
       }
       return -1
     }
@@ -795,9 +823,6 @@ class LookerDataTable {
    * Function to add variance columns directly within table vis rather than requiring a table calc
    */
   addVarianceColumns () {
-    console.log('addVarianceColumns() called')
-    console.log('available measures:', this.measures)
-
     var calcs = ['absolute', 'percent']
     calcs.forEach(calc => {
       Object.keys(this.variances).forEach(v => {
@@ -817,6 +842,7 @@ class LookerDataTable {
                 column.idx = baseline.idx + 2
                 column.label = 'Var %'
               }
+              column.pos = column.idx
               column.field = {
                 name: id
               }
@@ -826,10 +852,9 @@ class LookerDataTable {
               column.levels = []
               column.pivot_key = ''
               column.align = 'right'
-              column.sort_by_measure_values = [1, column.idx]
-              column.sort_by_pivot_values = [1, column.idx]
+              column.sort_by_measure_values = [1, column.pos]
+              column.sort_by_pivot_values = [1, column.pos]
 
-              console.log('addVarianceColumn', column)
               this.columns.push(column)
               if (variance.reverse) {
                 this.calculateVariance(id, calc, comparison, baseline)
@@ -890,7 +915,7 @@ class LookerDataTable {
     for (var c = columns.length-1; c >= 0; c--) {
       var idx = columns.length - 1 - c
 
-      if (this.sortColsBy === 'sort_by_pivot_values') {
+      if (this.sortColsBy === 'getSortByPivots') {
         header_levels[idx] = [...columns[c].levels, columns[c].field.name] // columns[c].levels.concat([columns[c].field.name])
       } else {
         header_levels[idx] = [columns[c].field.name, ...columns[c].levels]
@@ -931,7 +956,7 @@ class LookerDataTable {
         }
       }
 
-      if (this.sortColsBy === 'sort_by_pivot_values') {
+      if (this.sortColsBy === 'getSortByPivots') {
         var label_level = this.pivot_fields.length + 1
       } else {
         var label_level = 0
@@ -1009,6 +1034,34 @@ class LookerDataTable {
     return cells
   }
 
+  moveColumns(config, from, to, callback) {
+    if (from != to) {
+      var shift = to - from
+      var col_order = config.columnOrder
+      console.log('col_order before', JSON.stringify(col_order, null, 2))
+      for (var c = 0; c < this.columns.length; c++) {
+        var col = this.columns[c]
+        if (col.type == 'measure' && !col.super) {
+          if (col.pos >= from && col.pos < from + 10) {
+            console.log('MOVING COLUMN', col.id, col.pos, '->', col.pos + shift)
+            col.pos += shift
+          } else if (col.pos >= to && col.pos < from) {
+            console.log('NUDGING COLUMN', col.id, col.pos, '->', col.pos + 10)
+            col.pos += 10
+          } else if (col.pos >= from + 10 && col.pos < to + 10) {
+            console.log('NUDGING COLUMN', col.id, col.pos, '->', col.pos - 10)
+            col.pos -= 10
+          }
+          col_order[col.id] = col.pos
+        } 
+      }
+      callback(col_order)
+    }
+    console.log('col_order after', JSON.stringify(col_order, null, 2))
+  }
+
+  // TODO: getColumnOrder() {}
+
   /**
    * Returns dataset as a simple json object
    * Includes line_items only (e.g. no row subtotals)
@@ -1049,6 +1102,7 @@ const loadStylesheets = () => {
 };
 
 const options = {
+  columnOrder: {},
   subtotalDepth: {
     section: "Table",
     type: "number",
@@ -1067,10 +1121,10 @@ const options = {
     display: "select",
     label: "Sort Columns By",
     values: [
-      { 'Pivots': 'sort_by_pivot_values' },
-      { 'Measures': 'sort_by_measure_values' }
+      { 'Pivots': 'getSortByPivots' },
+      { 'Measures': 'getSortByMeasures' }
     ],
-    default: "sort_by_pivot_values",
+    default: "getSortByPivots",
   },
   spanRows: {
     section: "Table",
@@ -1255,7 +1309,7 @@ const getNewConfigOptions = function(table) {
   return newOptions
 }
 
-const buildReportTable = function(lookerData) {
+const buildReportTable = function(config, lookerData, callback) {
   var dropTarget = null;
   
   var table = d3.select('#visContainer')
@@ -1264,13 +1318,18 @@ const buildReportTable = function(lookerData) {
 
   var drag = d3.drag()
     .on('start', (source, idx) => {
-      console.log('drag start', source, idx)
+      // console.log('drag start', source, idx)
     })
-    .on('drag', (source, idx) => {
-      console.log('drag drag', source, idx, d3.event.x, d3.event.y)
-    })
+    // .on('drag', (source, idx) => {
+    //   console.log('drag drag', source, idx, d3.event.x, d3.event.y)
+    // })
     .on('end', (source, idx) => {
-      console.log('drag end', source, idx, dropTarget)
+      movingColumn = lookerData.getColumnById(source.id)
+      targetColumn = lookerData.getColumnById(dropTarget.id)
+      movingIdx = Math.floor(movingColumn.pos/10) * 10
+      targetIdx = Math.floor(targetColumn.pos/10) * 10
+      console.log('DRAG FROM', movingColumn, movingIdx, 'to', targetColumn, targetIdx)
+      lookerData.moveColumns(config, movingIdx, targetIdx, callback)
     })
 
   table.append('thead')
@@ -1286,7 +1345,7 @@ const buildReportTable = function(lookerData) {
             'align': column.align,
             'colspan': column.colspans[i]
           }
-          if (lookerData.sortColsBy == 'sort_by_pivot_values') {
+          if (lookerData.sortColsBy == 'getSortByPivots') {
             if (i < column.levels.length && column.pivoted) {
               header.text = column.levels[i]
             } else if (i === column.levels.length) {
@@ -1371,6 +1430,11 @@ looker.plugins.visualizations.add({
   },
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
+    const updateColumnOrder = newOrder => {
+      console.log('updateColumnOrder()', JSON.stringify(newOrder, null, 2))
+      this.trigger('updateConfig', [{columnOrder: newOrder}])
+    }
+
     this.clearErrors();
 
     console.log('data', data)
@@ -1394,13 +1458,16 @@ looker.plugins.visualizations.add({
       .append('div')
       .attr('id', 'visContainer')
 
+    if (typeof config.columnOrder === 'undefined') {
+      this.trigger('updateConfig', [{ columnOrder: {} }])
+    }
     lookerDataTable = new LookerDataTable(data, queryResponse, config)
     console.log(lookerDataTable)
 
     new_options = getNewConfigOptions(lookerDataTable)
     this.trigger('registerOptions', new_options)
 
-    buildReportTable(lookerDataTable)
+    buildReportTable(config, lookerDataTable, updateColumnOrder)
 
     // TODO: Hide vis until build complete
     done();
