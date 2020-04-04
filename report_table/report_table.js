@@ -162,7 +162,7 @@ class LookerDataTable {
     if (config.colSubtotals && this.pivot_fields.length == 2) {
       this.addColumnSubTotals()
     }
-    this.addVarianceColumns()
+    this.addVarianceColumns(config)
     this.sortColumns()
     this.applyFormatting(config)
 
@@ -320,14 +320,18 @@ class LookerDataTable {
       for (var m = 0; m < this.measures.length; m++) {
         var column = new Column(this.measures[m].name)
         column.idx = col_idx
+        console.log('addMeasures() col.id', column.id)
         try {
           if (typeof config.columnOrder[column.id] !== 'undefined') {
             column.pos = config.columnOrder[column.id]
+            console.log('addMeasures() config found, pos', column.pos)
           } else {
             column.pos = col_idx
+            console.log('addMeasures() config undefined, pos', column.pos)
           }
         }
         catch {
+          console.log('addMeasures() catch config.columnOrder undefined')
           column.pos = col_idx
         }
         column.field = queryResponse.fields.measure_like[m]
@@ -822,7 +826,7 @@ class LookerDataTable {
   /**
    * Function to add variance columns directly within table vis rather than requiring a table calc
    */
-  addVarianceColumns () {
+  addVarianceColumns (config) {
     var calcs = ['absolute', 'percent']
     calcs.forEach(calc => {
       Object.keys(this.variances).forEach(v => {
@@ -842,7 +846,19 @@ class LookerDataTable {
                 column.idx = baseline.idx + 2
                 column.label = 'Var %'
               }
-              column.pos = column.idx
+              try {
+                if (typeof config.columnOrder[column.id] !== 'undefined') {
+                  column.pos = config.columnOrder[column.id]
+                  console.log('addVarianceColumns() config found, pos', column.pos)
+                } else {
+                  column.pos = column.idx
+                  console.log('addVarianceColumns() config undefined, pos', column.pos)
+                }
+              }
+              catch {
+                console.log('addVarianceColumns() catch config.columnOrder undefined')
+                column.pos = column.idx
+              }
               column.field = {
                 name: id
               }
@@ -1038,7 +1054,6 @@ class LookerDataTable {
     if (from != to) {
       var shift = to - from
       var col_order = config.columnOrder
-      console.log('col_order before', JSON.stringify(col_order, null, 2))
       for (var c = 0; c < this.columns.length; c++) {
         var col = this.columns[c]
         if (col.type == 'measure' && !col.super) {
@@ -1057,7 +1072,6 @@ class LookerDataTable {
       }
       callback(col_order)
     }
-    console.log('col_order after', JSON.stringify(col_order, null, 2))
   }
 
   // TODO: getColumnOrder() {}
