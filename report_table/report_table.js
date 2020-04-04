@@ -2,8 +2,8 @@
 /* Dependency: https://cdnjs.cloudflare.com/ajax/libs/d3/5.15.0/d3.min.js */
 
 const formatter = d3.format(',.2f')
-// const css_link = 'https://raw.githack.com/ContrastingSounds/Looker-Custom-Vis/master/report_table/report_table.css'
-const css_link = 'https://jwtest.ngrok.io/report_table/report_table.css'
+const css_link = 'https://raw.githack.com/ContrastingSounds/Looker-Custom-Vis/master/report_table/report_table.css'
+// const css_link = 'https://jwtest.ngrok.io/report_table/report_table.css'
 
 /**
  * Returns an array of given length, all populated with same value
