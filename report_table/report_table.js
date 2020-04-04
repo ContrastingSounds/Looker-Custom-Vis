@@ -129,22 +129,8 @@ class LookerDataTable {
 
     this.variances = []
 
-    // CHECK FOR PIVOTS AND SUPERMEASURES
-    for (var p = 0; p < queryResponse.fields.pivots.length; p++) { 
-      var name = queryResponse.fields.pivots[p].name
-      this.pivot_fields.push(name) 
-    }
-
-    if (typeof queryResponse.pivots !== 'undefined') {
-      this.pivot_values = queryResponse.pivots
-      this.has_pivots = true
-    }
-
-    if (typeof queryResponse.fields.supermeasure_like !== 'undefined') {
-      this.has_supers = true
-    }
-
     var col_idx = 0
+    this.checkPivotsAndSupermeasures(queryResponse)
     this.checkVarianceCalculations(config)
     this.buildIndexColumn(queryResponse)
     this.addDimensions(config, queryResponse, col_idx)
@@ -167,6 +153,22 @@ class LookerDataTable {
     // addGroupHeaders
     // addUnitHeaders
     // addRowNumbers // to Index Column only?
+  }
+
+  checkPivotsAndSupermeasures(queryResponse) {
+    for (var p = 0; p < queryResponse.fields.pivots.length; p++) { 
+      var name = queryResponse.fields.pivots[p].name
+      this.pivot_fields.push(name) 
+    }
+
+    if (typeof queryResponse.pivots !== 'undefined') {
+      this.pivot_values = queryResponse.pivots
+      this.has_pivots = true
+    }
+
+    if (typeof queryResponse.fields.supermeasure_like !== 'undefined') {
+      this.has_supers = true
+    }
   }
 
   checkVarianceCalculations(config) {
@@ -311,8 +313,8 @@ class LookerDataTable {
         column.sort_by_pivot_values = [1, col_idx]
         this.columns.push(column)
 
-        if (typeof config['format|' + column.id] !== 'undefined') {
-          if (config['format|' + column.id] === 'hide') {
+        if (typeof config['style|' + column.id] !== 'undefined') {
+          if (config['style|' + column.id] === 'hide') {
             column.hide = true
           }
         }
@@ -343,8 +345,8 @@ class LookerDataTable {
         column.super = true
         column.sort_by_measure_values = [2, col_idx, ...newArray(this.pivot_fields.length, 1)]
         column.sort_by_pivot_values = [2, ...newArray(this.pivot_fields.length, 1), col_idx]
-        if (typeof config['format|' + column.id] !== 'undefined') {
-          if (config['format|' + column.id] === 'hide') {
+        if (typeof config['style|' + column.id] !== 'undefined') {
+          if (config['style|' + column.id] === 'hide') {
             column.hide = true
           }
         }
@@ -448,8 +450,8 @@ class LookerDataTable {
   applyFormatting(config) {
     for (var c = 0; c < this.columns.length; c++) {
       var col = this.columns[c]
-      if (typeof config['format|' + col.id] !== 'undefined') {
-        if (config['format|' + col.id] == 'conditional_formatting') {
+      if (typeof config['style|' + col.id] !== 'undefined') {
+        if (config['style|' + col.id] == 'black_red') {
           for (var r = 0; r < this.data.length; r++) {
             var row = this.data[r]
             if (row.data[col.id].value < 0) {
@@ -1178,14 +1180,14 @@ const getNewConfigOptions = function(table) {
       order: 100 + i * 10 + 1,
     }
 
-    newOptions['format|' + table.measures[i].name] = {
+    newOptions['style|' + table.measures[i].name] = {
       section: 'Measures',
       type: 'string',
-      label: 'Format',
+      label: 'Style',
       display: 'select',
       values: [
         {'Normal': 'normal'},
-        {'Conditional Formatting': 'conditional_formatting'},
+        {'Black/Red': 'black_red'},
         {'Hide': 'hide'}
       ],
       order: 100 + i * 10 + 2
