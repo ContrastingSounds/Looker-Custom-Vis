@@ -1028,6 +1028,7 @@ class LookerDataTable {
   }
 }
 
+
 /**
  * Adds CSS file provided as URL
  * @param {*} link 
@@ -1253,9 +1254,22 @@ const getNewConfigOptions = function(table) {
 }
 
 const buildReportTable = function(lookerData) {
+  var dropTarget = null;
+  
   var table = d3.select('#visContainer')
     .append('table')
     .attr('class', 'reportTable');
+
+  var drag = d3.drag()
+    .on('start', (source, idx) => {
+      console.log('drag start', source, idx)
+    })
+    .on('drag', (source, idx) => {
+      console.log('drag drag', source, idx, d3.event.x, d3.event.y)
+    })
+    .on('end', (source, idx) => {
+      console.log('drag end', source, idx, dropTarget)
+    })
 
   table.append('thead')
     .selectAll('tr')
@@ -1265,6 +1279,7 @@ const buildReportTable = function(lookerData) {
       .data(function(level, i) { 
         return lookerData.getColumnsToDisplay(i).map(function(column) {
           var header = {
+            'id': column.id,
             'text': '',
             'align': column.align,
             'colspan': column.colspans[i]
@@ -1289,12 +1304,17 @@ const buildReportTable = function(lookerData) {
       }).enter()
           .append('th')
           .text(d => d.text)
+          .attr('id', d => d.id)
           .attr('colspan', d => d.colspan)
           .attr('class', d => {
             var classes = []
             if (typeof d.align !== 'undefined') { classes.push(d.align) }
             return classes.join(' ')
           })
+          .attr('draggable', true)
+          .call(drag)
+          .on('mouseover', cell => dropTarget = cell)
+          .on('mouseout', () => dropTarget = null)
   
   table.append('tbody')
     .selectAll('tr')
