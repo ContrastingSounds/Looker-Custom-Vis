@@ -851,13 +851,21 @@ class LookerDataTable {
                   column.pos = config.columnOrder[column.id]
                   console.log('addVarianceColumns() config found, pos', column.pos)
                 } else {
-                  column.pos = column.idx
+                  if (calc === 'absolute') {
+                    column.idx = baseline.pos + 1
+                  } else {
+                    column.idx = baseline.pos + 2
+                  }
                   console.log('addVarianceColumns() config undefined, pos', column.pos)
                 }
               }
               catch {
                 console.log('addVarianceColumns() catch config.columnOrder undefined')
-                column.pos = column.idx
+                if (calc === 'absolute') {
+                  column.idx = baseline.pos + 1
+                } else {
+                  column.idx = baseline.pos + 2
+                }
               }
               column.field = {
                 name: id
