@@ -45,7 +45,6 @@ looker.plugins.visualizations.add({
     // chart building code copied directly from Elysium
     let chart = am4core.create("amContainer", am4charts.XYChart);
     chart.data = amData;
-    chart.logo.height = -15;
 
     let dateAxis = chart.xAxes.push(new am4charts.DateAxis());
     dateAxis.renderer.grid.template.location = 0;
